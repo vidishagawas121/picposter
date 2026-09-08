@@ -31,22 +31,57 @@ const getProfile = catchAsync(async (req, res) => {
 });
 
 /**
- * @desc    Update user profile details
+ * @desc    Update user profile details (Self-service profile edit)
  * @route   PUT /api/v1/user/profile
- * @access  Private
+ * @access  Private (Normal authenticated user via JWT)
  */
-const updateProfile = catchAsync(async (req, res) => {
-    const { name, email, preferredLanguage } = req.body;
+const updateProfile = catchAsync(async (req, res, next) => {
+    const { name, email, preferredLanguage, profilePhoto } = req.body;
     const updateData = {};
 
-    if (name !== undefined) updateData.name = name.trim();
-    if (email !== undefined) updateData.email = email.trim().toLowerCase();
-    if (preferredLanguage !== undefined) updateData.preferredLanguage = preferredLanguage;
+    // Validate and sanitize allowed fields
+    if (name !== undefined) {
+        if (typeof name !== 'string' || name.trim().length === 0) {
+            return next(new AppError('Name cannot be empty', 400, 'VALIDATION_ERROR'));
+        }
+        if (name.trim().length > 100) {
+            return next(new AppError('Name cannot exceed 100 characters', 400, 'VALIDATION_ERROR'));
+        }
+        updateData.name = name.trim();
+    }
 
+    if (email !== undefined) {
+        updateData.email = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    }
+
+    if (preferredLanguage !== undefined) {
+        const allowedLanguages = ['English', 'Hindi', 'Marathi', 'Gujarati', 'Punjabi', 'Tamil', 'Telugu', 'Bengali'];
+        if (!allowedLanguages.includes(preferredLanguage)) {
+            return next(
+                new AppError(
+                    `Invalid preferredLanguage. Allowed values: ${allowedLanguages.join(', ')}`,
+                    400,
+                    'VALIDATION_ERROR'
+                )
+            );
+        }
+        updateData.preferredLanguage = preferredLanguage;
+    }
+
+    if (profilePhoto !== undefined && typeof profilePhoto === 'string') {
+        updateData.profilePhoto = profilePhoto.trim();
+    }
+
+    // Security: STRICTLY update only req.user._id (derived from validated JWT).
+    // Disallows client tampering with userId or protected fields (role, isActive, isVerified, mobile).
     const user = await User.findByIdAndUpdate(req.user._id, updateData, {
         returnDocument: 'after',
         runValidators: true,
     });
+
+    if (!user) {
+        return next(new AppError('User not found', 404, 'USER_NOT_FOUND'));
+    }
 
     return sendSuccess(res, 200, 'User profile updated successfully', {
         id: user._id,
