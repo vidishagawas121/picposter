@@ -8,7 +8,10 @@ const userRoutes = require('./routes/userRoutes');
 const businessRoutes = require('./routes/businessRoutes');
 const posterRoutes = require('./routes/posterRoutes');
 const supportRoutes = require('./routes/supportRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
+const { protect } = require('./middlewares/authMiddleware');
+const adminGuard = require('./middlewares/adminGuard');
 const { apiLimiter } = require('./middlewares/rateLimiter');
 const errorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
@@ -57,6 +60,9 @@ app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/business', businessRoutes);
 app.use('/api/v1/posters', posterRoutes);
 app.use('/api/v1/support', supportRoutes);
+
+// Admin Routes (Protected by Auth & Admin RBAC)
+app.use('/api/v1/admin', protect, adminGuard, adminRoutes);
 
 // Catch-all for undefined routes
 app.all(/(.*)/, (req, res, next) => {

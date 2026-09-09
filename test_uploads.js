@@ -1,3 +1,5 @@
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 const sharp = require('sharp');
 const imageService = require('./src/services/imageService');
 const mongoose = require('mongoose');

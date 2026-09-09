@@ -4,6 +4,7 @@ const imageService = require('../services/imageService');
 const AppError = require('../utils/appError');
 const { sendSuccess } = require('../utils/apiResponse');
 const catchAsync = require('../utils/catchAsync');
+const { escapeRegex } = require('../utils/sanitizer');
 
 /**
  * @desc    List active categories sorted by sortOrder
@@ -33,7 +34,7 @@ const getCategories = catchAsync(async (req, res) => {
 const createCategory = catchAsync(async (req, res, next) => {
     const { name, slug, iconUrl, sortOrder, isActive } = req.body;
 
-    if (!name) {
+    if (!name || typeof name !== 'string') {
         return next(new AppError('Category name is required', 400, 'VALIDATION_ERROR'));
     }
 
@@ -67,15 +68,15 @@ const getPosters = catchAsync(async (req, res) => {
 
     const filter = { isActive: true };
 
-    if (category && category.toLowerCase() !== 'all') {
-        filter.category = new RegExp(`^${category.trim()}$`, 'i');
+    if (category && typeof category === 'string' && category.toLowerCase() !== 'all') {
+        filter.category = new RegExp(`^${escapeRegex(category.trim())}$`, 'i');
     }
 
-    if (language) {
-        filter.language = new RegExp(`^${language.trim()}$`, 'i');
+    if (language && typeof language === 'string') {
+        filter.language = new RegExp(`^${escapeRegex(language.trim())}$`, 'i');
     }
 
-    if (aspectRatio) {
+    if (aspectRatio && typeof aspectRatio === 'string') {
         filter.aspectRatio = aspectRatio;
     }
 
@@ -87,8 +88,8 @@ const getPosters = catchAsync(async (req, res) => {
         filter.isPremium = isPremium === 'true' || isPremium === true;
     }
 
-    if (search && search.trim()) {
-        const searchRegex = new RegExp(search.trim(), 'i');
+    if (search && typeof search === 'string' && search.trim()) {
+        const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
         filter.$or = [
             { title: searchRegex },
             { tags: searchRegex },

@@ -13,7 +13,7 @@ class AuthService {
      * Generate & send 6-digit cryptographic OTP
      */
     async sendOtp(mobile) {
-        if (!mobile || !/^\+[1-9]\d{1,14}$/.test(mobile.trim())) {
+        if (!mobile || typeof mobile !== 'string' || !/^\+[1-9]\d{1,14}$/.test(mobile.trim())) {
             throw new AppError(
                 'Please provide a valid E.164 mobile number (e.g. +919876543210)',
                 400,
@@ -79,8 +79,13 @@ class AuthService {
      * Verify OTP, register user if new, and issue JWT tokens
      */
     async verifyOtp(mobile, submittedOtp, deviceId = '', platform = 'android') {
-        if (!mobile || !submittedOtp) {
-            throw new AppError('Mobile number and OTP are required', 400, 'MISSING_FIELDS');
+        if (
+            !mobile ||
+            typeof mobile !== 'string' ||
+            !submittedOtp ||
+            (typeof submittedOtp !== 'string' && typeof submittedOtp !== 'number')
+        ) {
+            throw new AppError('Valid mobile number and OTP are required', 400, 'MISSING_FIELDS');
         }
 
         const normalizedMobile = mobile.trim();
