@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import logoImg from '../assets/logo.png';
 import {
   Box,
   Card,
@@ -16,7 +17,6 @@ import {
 import {
   PhoneIphoneRounded,
   LockOutlined,
-  ShieldRounded,
   ArrowForwardRounded,
 } from '@mui/icons-material';
 
@@ -98,20 +98,18 @@ export const LoginPage = () => {
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           <Box sx={{ textAlign: 'center', mb: 1 }}>
             <Box
+              component="img"
+              src={logoImg}
+              alt="PicPoster Logo"
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 56,
-                height: 56,
+                width: 68,
+                height: 68,
                 borderRadius: '16px',
-                background: 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)',
-                boxShadow: '0 10px 20px -5px rgba(99, 102, 241, 0.5)',
+                objectFit: 'contain',
+                boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.4)',
                 mb: 2,
               }}
-            >
-              <ShieldRounded sx={{ fontSize: 32, color: '#ffffff' }} />
-            </Box>
+            />
             <Typography variant="h4" fontWeight={800} className="gradient-text">
               PicPoster
             </Typography>

@@ -152,8 +152,11 @@ class ImageService {
             const match = fileUrl.match(/\/uploads\/([a-zA-Z0-9_\-\/]+\.[a-zA-Z0-9]+)/);
             if (match && match[1]) {
                 const relativePath = match[1];
-                const fullPath = path.join(this.baseUploadDir, relativePath);
-                if (fs.existsSync(fullPath)) {
+                const resolvedBase = path.resolve(this.baseUploadDir);
+                const fullPath = path.resolve(this.baseUploadDir, relativePath);
+
+                // Strictly ensure target file resides inside base uploads directory
+                if (fullPath.startsWith(resolvedBase) && fs.existsSync(fullPath)) {
                     fs.unlinkSync(fullPath);
                 }
             }

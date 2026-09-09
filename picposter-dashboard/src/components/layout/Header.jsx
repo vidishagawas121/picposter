@@ -87,7 +87,7 @@ export const Header = ({ onDrawerToggle }) => {
           >
             <Avatar
               src={user?.profilePhoto}
-              alt={user?.name || 'Admin'}
+              alt={user?.name ? user.name.replace(/\bowner\b/gi, '').trim() || 'Admin' : 'Admin'}
               sx={{
                 width: 38,
                 height: 38,
@@ -96,11 +96,11 @@ export const Header = ({ onDrawerToggle }) => {
                 border: '2px solid rgba(99, 102, 241, 0.5)',
               }}
             >
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+              {(user?.name ? user.name.replace(/\bowner\b/gi, '').trim() || 'A' : 'A').charAt(0).toUpperCase()}
             </Avatar>
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
               <Typography variant="subtitle2" fontWeight={700} lineHeight={1.2}>
-                {user?.name || 'Admin'}
+                {user?.name ? user.name.replace(/\bowner\b/gi, '').trim() || 'Admin' : 'Admin'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {user?.mobile || '+919876543210'}

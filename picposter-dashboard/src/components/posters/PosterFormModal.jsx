@@ -24,9 +24,9 @@ import {
   FormControl,
   FormLabel,
 } from '@mui/material';
-import { AutoAwesomeRounded, CollectionsRounded } from '@mui/icons-material';
+import { AutoAwesomeRounded, CollectionsRounded, LayersRounded } from '@mui/icons-material';
 
-export const PosterFormModal = ({ open, poster, onClose, onSuccess }) => {
+export const PosterFormModal = ({ open, poster, onClose, onSuccess, onSwitchToMulti }) => {
   const isEdit = Boolean(poster?._id || poster?.id);
 
   const [title, setTitle] = useState('');
@@ -154,24 +154,44 @@ export const PosterFormModal = ({ open, poster, onClose, onSuccess }) => {
       }}
     >
       <form onSubmit={handleSubmit}>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 36,
-              height: 36,
-              borderRadius: '10px',
-              bgcolor: 'rgba(99, 102, 241, 0.15)',
-              color: 'primary.main',
-            }}
-          >
-            {isEdit ? <CollectionsRounded fontSize="small" /> : <AutoAwesomeRounded fontSize="small" />}
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                bgcolor: 'rgba(99, 102, 241, 0.15)',
+                color: 'primary.main',
+              }}
+            >
+              {isEdit ? <CollectionsRounded fontSize="small" /> : <AutoAwesomeRounded fontSize="small" />}
+            </Box>
+            <Typography variant="h6" fontWeight={700}>
+              {isEdit ? 'Edit Poster Template' : 'Add Single Poster'}
+            </Typography>
           </Box>
-          <Typography variant="h6" fontWeight={700}>
-            {isEdit ? 'Edit Poster Template' : 'Add New Poster Template'}
-          </Typography>
+
+          {!isEdit && onSwitchToMulti && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="secondary"
+              startIcon={<LayersRounded fontSize="small" />}
+              onClick={onSwitchToMulti}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.78rem',
+                borderRadius: 2,
+              }}
+            >
+              Switch to Multiple Upload
+            </Button>
+          )}
         </DialogTitle>
 
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2 }}>

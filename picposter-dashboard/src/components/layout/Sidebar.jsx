@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import logoImg from '../../assets/logo.png';
 import {
   Drawer,
   List,
@@ -17,7 +18,6 @@ import {
   CategoryRounded,
   GroupRounded,
   HeadsetMicRounded,
-  AutoAwesomeRounded,
 } from '@mui/icons-material';
 
 const NAV_ITEMS = [
@@ -44,27 +44,25 @@ export const Sidebar = ({ mobileOpen, onDrawerClose }) => {
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#0e1422' }}>
       {/* Brand logo header */}
-      <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Box
+          component="img"
+          src={logoImg}
+          alt="PicPoster Logo"
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             width: 40,
             height: 40,
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)',
-            boxShadow: '0 8px 16px -4px rgba(99, 102, 241, 0.4)',
+            borderRadius: '10px',
+            objectFit: 'contain',
+            flexShrink: 0,
           }}
-        >
-          <AutoAwesomeRounded sx={{ color: '#ffffff', fontSize: 22 }} />
-        </Box>
+        />
         <Box>
           <Typography variant="h6" fontWeight={800} className="gradient-text" lineHeight={1.1}>
             PicPoster
           </Typography>
           <Typography variant="caption" color="text.secondary" fontWeight={500}>
-            Owner Admin
+            Admin
           </Typography>
         </Box>
       </Box>

@@ -8,6 +8,11 @@ export const posterApi = {
     axiosInstance.post('/admin/posters', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  createMultiplePosters: (formData, onUploadProgress) =>
+    axiosInstance.post('/admin/posters/bulk', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
+    }),
   updatePoster: (id, formData) =>
     axiosInstance.put(`/admin/posters/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

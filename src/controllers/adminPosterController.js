@@ -5,6 +5,7 @@ const imageService = require('../services/imageService');
 const AppError = require('../utils/appError');
 const { sendSuccess } = require('../utils/apiResponse');
 const catchAsync = require('../utils/catchAsync');
+const { escapeRegex } = require('../utils/sanitizer');
 
 /**
  * @desc    Get all posters for admin with full filters and pagination
@@ -36,21 +37,21 @@ const getPosters = catchAsync(async (req, res) => {
     }
 
     // Filter by Category (slug or ObjectId)
-    if (category && category.toLowerCase() !== 'all') {
+    if (category && typeof category === 'string' && category.toLowerCase() !== 'all') {
         if (mongoose.Types.ObjectId.isValid(category)) {
             filter.$or = [{ categoryId: category }, { category: category }];
         } else {
-            filter.category = new RegExp(`^${category.trim()}$`, 'i');
+            filter.category = new RegExp(`^${escapeRegex(category.trim())}$`, 'i');
         }
     }
 
     // Filter by Language
-    if (language && language.toLowerCase() !== 'all') {
-        filter.language = new RegExp(`^${language.trim()}$`, 'i');
+    if (language && typeof language === 'string' && language.toLowerCase() !== 'all') {
+        filter.language = new RegExp(`^${escapeRegex(language.trim())}$`, 'i');
     }
 
     // Filter by Aspect Ratio
-    if (aspectRatio && aspectRatio.toLowerCase() !== 'all') {
+    if (aspectRatio && typeof aspectRatio === 'string' && aspectRatio.toLowerCase() !== 'all') {
         filter.aspectRatio = aspectRatio;
     }
 
@@ -65,8 +66,8 @@ const getPosters = catchAsync(async (req, res) => {
     }
 
     // Search by title or tags
-    if (search && search.trim()) {
-        const searchRegex = new RegExp(search.trim(), 'i');
+    if (search && typeof search === 'string' && search.trim()) {
+        const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
         const searchConditions = [
             { title: searchRegex },
             { tags: searchRegex },
@@ -170,7 +171,7 @@ const createPoster = catchAsync(async (req, res, next) => {
         }
     } else {
         categoryDoc = await Category.findOne({
-            $or: [{ slug: categorySlug }, { name: new RegExp(`^${category.trim()}$`, 'i') }],
+            $or: [{ slug: categorySlug }, { name: new RegExp(`^${escapeRegex(category.trim())}$`, 'i') }],
         });
     }
 
@@ -196,6 +197,129 @@ const createPoster = catchAsync(async (req, res, next) => {
     });
 
     return sendSuccess(res, 201, 'Poster created successfully', poster);
+});
+
+/**
+ * @desc    Create multiple posters at once (multipart/form-data)
+ * @route   POST /api/v1/admin/posters/bulk
+ * @access  Admin
+ */
+const createMultiplePosters = catchAsync(async (req, res, next) => {
+    const {
+        title,
+        titlePrefix,
+        category,
+        language = 'English',
+        tags,
+        aspectRatio = '1:1',
+        isTrending,
+        isPremium,
+        isActive,
+    } = req.body;
+
+    if (!category) {
+        return next(new AppError('Category is required', 400, 'VALIDATION_ERROR'));
+    }
+
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files || files.length === 0) {
+        return next(new AppError('Please select at least one poster image to upload', 400, 'IMAGE_REQUIRED'));
+    }
+
+    // Resolve category name and ID once
+    let categorySlug = category.trim().toLowerCase();
+    let categoryDoc = null;
+
+    if (mongoose.Types.ObjectId.isValid(category)) {
+        categoryDoc = await Category.findById(category);
+        if (categoryDoc) {
+            categorySlug = categoryDoc.slug;
+        }
+    } else {
+        categoryDoc = await Category.findOne({
+            $or: [{ slug: categorySlug }, { name: new RegExp(`^${escapeRegex(category.trim())}$`, 'i') }],
+        });
+    }
+
+    // Parse tags once
+    const parsedTags = Array.isArray(tags)
+        ? tags
+        : typeof tags === 'string'
+        ? tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+        : [];
+
+    const normalizedAspectRatio = ['1:1', '4:5', '9:16', '16:9'].includes(aspectRatio) ? aspectRatio : '1:1';
+    const boolTrending = isTrending === 'true' || isTrending === true;
+    const boolPremium = isPremium === 'true' || isPremium === true;
+    const boolActive = isActive !== undefined ? (isActive === 'true' || isActive === true) : true;
+
+    const baseTitle = (titlePrefix || title || '').trim();
+
+    const successful = [];
+    const failed = [];
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+            // Validate MIME type
+            const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+            if (!allowedMimeTypes.includes(file.mimetype)) {
+                throw new Error(`Invalid file type (${file.mimetype}). Only JPEG, PNG, and WebP images are allowed.`);
+            }
+
+            // Derive poster title
+            let itemTitle = '';
+            if (baseTitle) {
+                itemTitle = files.length > 1 ? `${baseTitle} ${i + 1}` : baseTitle;
+            } else {
+                const nameWithoutExt = (file.originalname || '')
+                    .replace(/\.[^/.]+$/, '')
+                    .replace(/[-_]+/g, ' ')
+                    .trim();
+                itemTitle = nameWithoutExt.length >= 3 ? nameWithoutExt : `Poster ${i + 1}`;
+            }
+
+            if (itemTitle.length < 3) itemTitle = `${itemTitle} Poster`;
+            if (itemTitle.length > 120) itemTitle = itemTitle.substring(0, 120).trim();
+
+            // Process image through Sharp pipeline
+            const processed = await imageService.processPosterImage(file.buffer, req);
+
+            // Create individual Poster document
+            const posterDoc = await Poster.create({
+                title: itemTitle,
+                imageUrl: processed.imageUrl,
+                thumbnailUrl: processed.thumbnailUrl || processed.imageUrl,
+                category: categorySlug,
+                categoryId: categoryDoc ? categoryDoc._id : null,
+                language: language || 'English',
+                tags: parsedTags,
+                aspectRatio: normalizedAspectRatio,
+                isTrending: boolTrending,
+                isPremium: boolPremium,
+                isActive: boolActive,
+            });
+
+            successful.push(posterDoc);
+        } catch (err) {
+            console.error(`Error processing poster upload (${file.originalname}):`, err.message);
+            failed.push({
+                filename: file.originalname || `file_${i + 1}`,
+                error: err.message || 'Processing failed',
+            });
+        }
+    }
+
+    const statusCode = successful.length > 0 ? 201 : 400;
+    const message = `Processed ${files.length} poster(s): ${successful.length} succeeded, ${failed.length} failed`;
+
+    return sendSuccess(res, statusCode, message, {
+        total: files.length,
+        successCount: successful.length,
+        failureCount: failed.length,
+        successful,
+        failed,
+    });
 });
 
 /**
@@ -255,7 +379,7 @@ const updatePoster = catchAsync(async (req, res, next) => {
             if (categoryDoc) categorySlug = categoryDoc.slug;
         } else {
             categoryDoc = await Category.findOne({
-                $or: [{ slug: categorySlug }, { name: new RegExp(`^${category.trim()}$`, 'i') }],
+                $or: [{ slug: categorySlug }, { name: new RegExp(`^${escapeRegex(category.trim())}$`, 'i') }],
             });
         }
         poster.category = categorySlug;
@@ -377,6 +501,7 @@ module.exports = {
     getPosters,
     getPosterById,
     createPoster,
+    createMultiplePosters,
     updatePoster,
     updatePosterStatus,
     deletePoster,

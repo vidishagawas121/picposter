@@ -1,6 +1,9 @@
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 const http = require('http');
+const mongoose = require('mongoose');
+require('dotenv').config();
+const connectDB = require('./src/config/db');
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
@@ -50,6 +53,7 @@ const request = (path, method = 'GET', body = null, token = null) => {
 };
 
 const runUserProfileTests = async () => {
+    await connectDB();
     console.log('====================================================');
     console.log('👤 Starting PicPoster User Profile Verification Test Suite');
     console.log('====================================================\n');
@@ -144,6 +148,12 @@ const runUserProfileTests = async () => {
         assert(user2VerifyRes.status === 200, '8. User 2 Authentication successful', JSON.stringify(user2VerifyRes.data));
         const user2Token = user2VerifyRes.data.data.tokens.accessToken;
 
+        // If user was previously deactivated during admin tests, ensure isActive is reset to true
+        if (!user2VerifyRes.data.data.user.isActive) {
+            const User = require('./src/models/User');
+            await User.findByIdAndUpdate(user2VerifyRes.data.data.user._id, { isActive: true });
+        }
+
         // --- 8. GET User 2 Profile: Verify User 2's data is distinct and NOT User 1's ---
         const user2ProfileRes = await request('/api/v1/user/profile', 'GET', null, user2Token);
         assert(
@@ -208,13 +218,16 @@ const runUserProfileTests = async () => {
 
         if (failed === 0) {
             console.log('🎉 ALL NORMAL USER PROFILE TESTS PASSED WITH 100% ACCURACY!');
+            await mongoose.disconnect();
             process.exit(0);
         } else {
             console.error('⚠️ Some user profile tests failed.');
+            await mongoose.disconnect();
             process.exit(1);
         }
     } catch (err) {
         console.error('User profile test error:', err);
+        try { await mongoose.disconnect(); } catch (e) {}
         process.exit(1);
     }
 };

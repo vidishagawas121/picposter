@@ -2,6 +2,7 @@ const SupportQuery = require('../models/SupportQuery');
 const AppError = require('../utils/appError');
 const { sendSuccess } = require('../utils/apiResponse');
 const catchAsync = require('../utils/catchAsync');
+const { escapeRegex } = require('../utils/sanitizer');
 
 /**
  * @desc    Get all support queries with filtering and pagination
@@ -22,14 +23,15 @@ const getSupportQueries = catchAsync(async (req, res) => {
 
     const filter = {};
 
-    if (status && status.toLowerCase() !== 'all') {
-        const normalized = status.toLowerCase();
+    if (status && typeof status === 'string' && status.toLowerCase() !== 'all') {
+        const normalized = escapeRegex(status.toLowerCase().trim());
         // Support matching case-insensitively (e.g. pending, PENDING, in_progress, IN_PROGRESS)
         filter.status = new RegExp(`^${normalized}$`, 'i');
     }
 
-    if (search && search.trim()) {
-        const searchRegex = new RegExp(search.trim(), 'i');
+    if (search && typeof search === 'string' && search.trim()) {
+        const escaped = escapeRegex(search.trim());
+        const searchRegex = new RegExp(escaped, 'i');
         filter.$or = [
             { name: searchRegex },
             { contact: searchRegex },

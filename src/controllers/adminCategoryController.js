@@ -4,6 +4,7 @@ const imageService = require('../services/imageService');
 const AppError = require('../utils/appError');
 const { sendSuccess } = require('../utils/apiResponse');
 const catchAsync = require('../utils/catchAsync');
+const { escapeRegex } = require('../utils/sanitizer');
 
 /**
  * @desc    Get all categories for admin with poster count
@@ -96,9 +97,10 @@ const createCategory = catchAsync(async (req, res, next) => {
         .replace(/(^-|-$)+/g, '');
 
     // Check duplicate name or slug
+    const escapedName = escapeRegex(name.trim());
     const existing = await Category.findOne({
         $or: [
-            { name: new RegExp(`^${name.trim()}$`, 'i') },
+            { name: new RegExp(`^${escapedName}$`, 'i') },
             { slug: generatedSlug },
         ],
     });
@@ -141,13 +143,14 @@ const updateCategory = catchAsync(async (req, res, next) => {
     const { name, slug, sortOrder, isActive } = req.body;
 
     if (name !== undefined) {
-        if (name.trim().length < 2 || name.trim().length > 50) {
+        if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 50) {
             return next(new AppError('Category name must be between 2 and 50 characters', 400, 'VALIDATION_ERROR'));
         }
 
+        const escapedUpdateName = escapeRegex(name.trim());
         const duplicateName = await Category.findOne({
             _id: { $ne: category._id },
-            name: new RegExp(`^${name.trim()}$`, 'i'),
+            name: new RegExp(`^${escapedUpdateName}$`, 'i'),
         });
         if (duplicateName) {
             return next(new AppError('A category with this name already exists', 400, 'DUPLICATE_CATEGORY_NAME'));

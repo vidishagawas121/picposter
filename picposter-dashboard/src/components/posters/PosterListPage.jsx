@@ -6,6 +6,7 @@ import SearchBar from '../common/SearchBar';
 import StatusBadge from '../common/StatusBadge';
 import ConfirmDialog from '../common/ConfirmDialog';
 import PosterFormModal from './PosterFormModal';
+import MultiPosterFormModal from './MultiPosterFormModal';
 import PosterDetailPanel from './PosterDetailPanel';
 import { formatNumber } from '../../utils/formatters';
 import { LANGUAGES } from '../../utils/constants';
@@ -22,6 +23,7 @@ import {
   Tooltip,
   TableRow,
   TableCell,
+  Menu,
 } from '@mui/material';
 import {
   AddRounded,
@@ -30,6 +32,9 @@ import {
   VisibilityRounded,
   StarRounded,
   WhatshotRounded,
+  KeyboardArrowDownRounded,
+  AddPhotoAlternateRounded,
+  LayersRounded,
 } from '@mui/icons-material';
 
 export const PosterListPage = () => {
@@ -53,6 +58,8 @@ export const PosterListPage = () => {
 
   // Modals state
   const [formOpen, setFormOpen] = useState(false);
+  const [multiFormOpen, setMultiFormOpen] = useState(false);
+  const [addMenuAnchor, setAddMenuAnchor] = useState(null);
   const [selectedPoster, setSelectedPoster] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -170,18 +177,133 @@ export const PosterListPage = () => {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddRounded />}
-          onClick={() => {
-            setSelectedPoster(null);
-            setFormOpen(true);
-          }}
-          sx={{ py: 1.2, px: 2.5 }}
-        >
-          Add New Poster
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddRounded />}
+            endIcon={<KeyboardArrowDownRounded />}
+            onClick={(e) => setAddMenuAnchor(e.currentTarget)}
+            sx={{
+              py: 1.2,
+              px: 2.5,
+              fontWeight: 700,
+              boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.35)',
+            }}
+          >
+            Add New Poster
+          </Button>
+
+          <Menu
+            anchorEl={addMenuAnchor}
+            open={Boolean(addMenuAnchor)}
+            onClose={() => setAddMenuAnchor(null)}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+            PaperProps={{
+              sx: {
+                bgcolor: '#111827',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 3,
+                p: 1,
+                minWidth: 280,
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.8)',
+              },
+            }}
+          >
+            <MenuItem
+              onClick={() => {
+                setAddMenuAnchor(null);
+                setSelectedPoster(null);
+                setFormOpen(true);
+              }}
+              sx={{
+                py: 1.5,
+                px: 2,
+                borderRadius: 2,
+                display: 'flex',
+                gap: 1.5,
+                alignItems: 'center',
+                '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.12)' },
+              }}
+            >
+              <Box
+                sx={{
+                  p: 1,
+                  borderRadius: 2,
+                  bgcolor: 'rgba(99, 102, 241, 0.15)',
+                  color: 'primary.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <AddPhotoAlternateRounded fontSize="small" />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  Add Single Poster
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Upload 1 poster with single artwork
+                </Typography>
+              </Box>
+            </MenuItem>
+
+            <MenuItem
+              onClick={() => {
+                setAddMenuAnchor(null);
+                setMultiFormOpen(true);
+              }}
+              sx={{
+                py: 1.5,
+                px: 2,
+                mt: 0.5,
+                borderRadius: 2,
+                display: 'flex',
+                gap: 1.5,
+                alignItems: 'center',
+                '&:hover': { bgcolor: 'rgba(168, 85, 247, 0.12)' },
+              }}
+            >
+              <Box
+                sx={{
+                  p: 1,
+                  borderRadius: 2,
+                  bgcolor: 'rgba(168, 85, 247, 0.15)',
+                  color: 'secondary.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <LayersRounded fontSize="small" />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Add Multiple Posters
+                  </Typography>
+                  <Chip
+                    label="Bulk"
+                    size="small"
+                    color="secondary"
+                    sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }}
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary">
+                  Upload multiple posters at once
+                </Typography>
+              </Box>
+            </MenuItem>
+          </Menu>
+        </Box>
       </Box>
 
       {/* Filters Bar */}
@@ -400,6 +522,16 @@ export const PosterListPage = () => {
         open={formOpen}
         poster={selectedPoster}
         onClose={() => setFormOpen(false)}
+        onSuccess={fetchPosters}
+        onSwitchToMulti={() => {
+          setFormOpen(false);
+          setMultiFormOpen(true);
+        }}
+      />
+
+      <MultiPosterFormModal
+        open={multiFormOpen}
+        onClose={() => setMultiFormOpen(false)}
         onSuccess={fetchPosters}
       />
 

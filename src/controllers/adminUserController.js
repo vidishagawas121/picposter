@@ -4,6 +4,7 @@ const UserCreation = require('../models/UserCreation');
 const AppError = require('../utils/appError');
 const { sendSuccess } = require('../utils/apiResponse');
 const catchAsync = require('../utils/catchAsync');
+const { escapeRegex } = require('../utils/sanitizer');
 
 /**
  * @desc    Get all users with filtering, search, and pagination
@@ -36,7 +37,7 @@ const getUsers = catchAsync(async (req, res) => {
         filter.isActive = isActive === 'true' || isActive === true;
     }
 
-    if (role && role.toLowerCase() !== 'all') {
+    if (role && typeof role === 'string' && role.toLowerCase() !== 'all') {
         filter.role = role.toLowerCase().trim();
     }
 
@@ -50,8 +51,9 @@ const getUsers = catchAsync(async (req, res) => {
         }
     }
 
-    if (search && search.trim()) {
-        const searchRegex = new RegExp(search.trim(), 'i');
+    if (search && typeof search === 'string' && search.trim()) {
+        const escaped = escapeRegex(search.trim());
+        const searchRegex = new RegExp(escaped, 'i');
         filter.$or = [
             { name: searchRegex },
             { mobile: searchRegex },

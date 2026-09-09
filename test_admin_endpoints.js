@@ -1,4 +1,7 @@
 const http = require('http');
+const mongoose = require('mongoose');
+require('dotenv').config();
+const connectDB = require('./src/config/db');
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
@@ -48,6 +51,7 @@ const request = (path, method = 'GET', body = null, token = null) => {
 };
 
 const runAdminTests = async () => {
+    await connectDB();
     console.log('====================================================');
     console.log('🛡️ Starting PicPoster Owner/Admin API Test Suite');
     console.log('====================================================\n');
@@ -270,13 +274,16 @@ const runAdminTests = async () => {
 
         if (failed === 0) {
             console.log('🎉 ALL OWNER/ADMIN BACKEND APIS VERIFIED AND WORKING PERFECTLY!');
+            await mongoose.disconnect();
             process.exit(0);
         } else {
             console.error('⚠️ Some admin tests failed.');
+            await mongoose.disconnect();
             process.exit(1);
         }
     } catch (err) {
         console.error('Admin test execution error:', err);
+        try { await mongoose.disconnect(); } catch (e) {}
         process.exit(1);
     }
 };

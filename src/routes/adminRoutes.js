@@ -13,6 +13,7 @@ const adminAnalyticsController = require('../controllers/adminAnalyticsControlle
 // ==========================================
 router.get('/posters/stats', adminPosterController.getPosterStats);
 router.get('/posters', adminPosterController.getPosters);
+router.post('/posters/bulk', upload.array('images', 50), adminPosterController.createMultiplePosters);
 router.get('/posters/:id', adminPosterController.getPosterById);
 router.post('/posters', upload.single('image'), adminPosterController.createPoster);
 router.put('/posters/:id', upload.single('image'), adminPosterController.updatePoster);

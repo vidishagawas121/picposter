@@ -6,8 +6,15 @@ const errorHandler = (err, req, res, next) => {
     let errorCode = err.errorCode || 'INTERNAL_SERVER_ERROR';
     let errors = err.errors || [];
 
+    // Body parser JSON Syntax Error
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        statusCode = 400;
+        errorCode = 'INVALID_JSON';
+        message = 'Malformed JSON payload in request body';
+    }
+
     // Mongoose Validation Error
-    if (err.name === 'ValidationError') {
+    else if (err.name === 'ValidationError') {
         statusCode = 400;
         errorCode = 'VALIDATION_ERROR';
         message = 'Invalid request payload';
@@ -56,11 +63,26 @@ const errorHandler = (err, req, res, next) => {
         }
     }
 
+    // Sharp Image Processing Errors (Unsupported or corrupted image)
+    else if (err.message && (err.message.includes('unsupported image format') || err.message.includes('Input buffer'))) {
+        statusCode = 400;
+        errorCode = 'INVALID_IMAGE_FILE';
+        message = 'Uploaded image is corrupted or in an unsupported format. Please upload a valid JPEG, PNG, or WebP image.';
+    }
+
+    // Mask non-operational 500 errors in production to prevent information leakage
+    if (statusCode === 500 && process.env.NODE_ENV === 'production' && !err.isOperational) {
+        message = 'Internal server error. Please try again later.';
+        errorCode = 'INTERNAL_SERVER_ERROR';
+        errors = [];
+    }
+
     if (process.env.NODE_ENV === 'development' && statusCode === 500) {
-        console.error('Unhandled Error:', err);
+        console.error(`[SERVER ERROR ${statusCode}]`, err);
     }
 
     return sendError(res, statusCode, message, errorCode, errors);
 };
 
 module.exports = errorHandler;
+

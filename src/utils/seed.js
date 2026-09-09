@@ -103,7 +103,7 @@ const seedDatabase = async () => {
             { mobile: '+919876543210' },
             {
                 mobile: '+919876543210',
-                name: 'Admin Owner',
+                name: 'Admin',
                 email: 'admin@picposter.com',
                 role: 'admin',
                 isVerified: true,
