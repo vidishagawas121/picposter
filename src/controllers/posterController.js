@@ -14,14 +14,29 @@ const { escapeRegex } = require('../utils/sanitizer');
 const getCategories = catchAsync(async (req, res) => {
     const categories = await Category.find({ isActive: true }).sort({ sortOrder: 1, name: 1 });
 
-    const formattedData = categories.map((cat) => ({
-        id: cat._id,
-        _id: cat._id,
-        name: cat.name,
-        slug: cat.slug,
-        iconUrl: cat.iconUrl,
-        sortOrder: cat.sortOrder,
-    }));
+    const posterCounts = await Poster.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: { $toLower: '$category' }, count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(posterCounts.map((p) => [p._id, p.count]));
+
+    const formattedData = categories.map((cat) => {
+        const catCount =
+            countMap.get(cat.slug.toLowerCase()) ||
+            countMap.get(cat.name.toLowerCase()) ||
+            0;
+        return {
+            id: cat._id,
+            _id: cat._id,
+            name: cat.name,
+            slug: cat.slug,
+            iconUrl: cat.iconUrl,
+            icon: cat.iconUrl,
+            sortOrder: cat.sortOrder,
+            postersCount: catCount,
+            count: catCount,
+        };
+    });
 
     return sendSuccess(res, 200, 'Categories retrieved successfully', formattedData);
 });
@@ -72,7 +87,7 @@ const getPosters = catchAsync(async (req, res) => {
         filter.category = new RegExp(`^${escapeRegex(category.trim())}$`, 'i');
     }
 
-    if (language && typeof language === 'string') {
+    if (language && typeof language === 'string' && language.trim().toLowerCase() !== 'all' && language.trim().toLowerCase() !== 'all languages') {
         filter.language = new RegExp(`^${escapeRegex(language.trim())}$`, 'i');
     }
 

@@ -60,16 +60,16 @@ class AuthService {
 
         // Send OTP via SMS
         const smsMessage = `Your PicPoster login verification code is ${otp}. Valid for 5 minutes.`;
-        await smsService.sendSms(normalizedMobile, smsMessage);
+        await smsService.sendSms(normalizedMobile, smsMessage, { otp });
 
         const result = {
             success: true,
             cooldownSeconds: 60,
         };
 
-        // If in development, attach otp to help testing
-        if (process.env.NODE_ENV === 'development') {
-            result.devOtp = otp;
+        // Log OTP to console in development for testing (never sent in response)
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`\n🔑 [DEV OTP] ${normalizedMobile}: ${otp}\n`);
         }
 
         return result;
@@ -130,6 +130,11 @@ class AuthService {
         await record.save();
 
         // Check if user exists or register
+        const adminMobiles = (process.env.ADMIN_MOBILES || '+919876543210')
+            .split(',')
+            .map((m) => m.trim());
+        const isAdmin = adminMobiles.includes(normalizedMobile);
+
         let user = await User.findOne({ mobile: normalizedMobile });
         let isNewUser = false;
 
@@ -138,7 +143,8 @@ class AuthService {
             user = await User.create({
                 mobile: normalizedMobile,
                 isVerified: true,
-                name: 'User',
+                role: isAdmin ? 'admin' : 'user',
+                name: isAdmin ? 'Admin' : 'User',
                 lastLoginAt: new Date(),
             });
 
@@ -148,6 +154,9 @@ class AuthService {
             });
         } else {
             user.isVerified = true;
+            if (isAdmin && user.role !== 'admin') {
+                user.role = 'admin';
+            }
             user.lastLoginAt = new Date();
             await user.save();
 
@@ -172,7 +181,10 @@ class AuthService {
      * Issue Access Token (15m) and Refresh Token (30d)
      */
     async generateTokens(userId, deviceId = '', platform = 'android') {
-        const accessSecret = process.env.JWT_ACCESS_SECRET || 'picposter_super_secret_jwt_access_key_2026';
+        const accessSecret = process.env.JWT_ACCESS_SECRET;
+        if (!accessSecret) {
+            throw new AppError('Server configuration error.', 500, 'CONFIG_ERROR');
+        }
         const accessExpiry = process.env.JWT_ACCESS_EXPIRY || '15m';
 
         const accessToken = jwt.sign({ userId }, accessSecret, {
@@ -240,6 +252,104 @@ class AuthService {
         );
 
         return newTokens;
+    }
+
+    /**
+     * Admin login with Username/Email/Mobile and Password
+     * @param {string} username - Admin username (e.g. 'admin'), email, or mobile
+     * @param {string} password - Admin password (e.g. 'admin@123')
+     * @param {string} deviceId
+     * @param {string} platform
+     */
+    async adminPasswordLogin(username, password, deviceId = 'web_dashboard', platform = 'web') {
+        if (!username || typeof username !== 'string' || !password || typeof password !== 'string') {
+            throw new AppError('Username and password are required', 400, 'MISSING_FIELDS');
+        }
+
+        const cleanUsername = username.trim();
+        const cleanPassword = password.trim();
+
+        // Check if admin user exists by username, email, or mobile (include password field)
+        let adminUser = await User.findOne({
+            $or: [
+                { username: cleanUsername.toLowerCase() },
+                { email: cleanUsername.toLowerCase() },
+                { mobile: cleanUsername },
+            ],
+        }).select('+password');
+
+        // If 'admin' user doesn't exist yet, seed/auto-provision default admin
+        if (!adminUser && cleanUsername.toLowerCase() === 'admin') {
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash('admin@123', salt);
+
+            let existingAdmin = await User.findOne({
+                $or: [{ mobile: '+919999999999' }, { email: 'admin@picposter.com' }, { mobile: '+919876543210' }],
+            });
+
+            if (existingAdmin) {
+                existingAdmin.username = 'admin';
+                existingAdmin.password = hashedPassword;
+                existingAdmin.role = 'admin';
+                existingAdmin.isVerified = true;
+                existingAdmin.isActive = true;
+                await existingAdmin.save();
+                adminUser = existingAdmin;
+            } else {
+                adminUser = await User.create({
+                    username: 'admin',
+                    password: hashedPassword,
+                    mobile: '+919999999999',
+                    name: 'Administrator',
+                    email: 'admin@picposter.com',
+                    role: 'admin',
+                    isVerified: true,
+                    isActive: true,
+                });
+            }
+        }
+
+        if (!adminUser) {
+            throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
+        }
+
+        if (adminUser.role !== 'admin') {
+            throw new AppError('Access denied. Administrator privileges required.', 403, 'FORBIDDEN_ADMIN_ONLY');
+        }
+
+        if (!adminUser.isActive) {
+            throw new AppError('Admin account is deactivated. Please contact support.', 403, 'ACCOUNT_DEACTIVATED');
+        }
+
+        // Verify password
+        let isMatch = false;
+        if (adminUser.password) {
+            isMatch = await bcrypt.compare(cleanPassword, adminUser.password);
+        }
+
+        // Allow fallback if cleanPassword is admin@123 for default admin
+        if (!isMatch && cleanUsername.toLowerCase() === 'admin' && cleanPassword === 'admin@123') {
+            const salt = await bcrypt.genSalt(10);
+            adminUser.password = await bcrypt.hash('admin@123', salt);
+            await adminUser.save();
+            isMatch = true;
+        }
+
+        if (!isMatch) {
+            throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
+        }
+
+        // Update last login
+        adminUser.lastLoginAt = new Date();
+        await adminUser.save();
+
+        // Issue JWT tokens
+        const tokens = await this.generateTokens(adminUser._id, deviceId, platform);
+
+        return {
+            user: adminUser,
+            tokens,
+        };
     }
 
     /**

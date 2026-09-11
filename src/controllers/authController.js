@@ -13,7 +13,6 @@ const sendOtp = catchAsync(async (req, res) => {
 
     return sendSuccess(res, 200, `OTP sent successfully to ${mobile}`, {
         cooldownSeconds: result.cooldownSeconds,
-        ...(result.devOtp ? { devOtp: result.devOtp } : {}),
     });
 });
 
@@ -56,6 +55,30 @@ const refreshToken = catchAsync(async (req, res) => {
 });
 
 /**
+ * @desc    Admin username & password login
+ * @route   POST /api/v1/auth/admin-login
+ * @access  Public
+ */
+const adminLogin = catchAsync(async (req, res) => {
+    const { username, password, deviceId, platform } = req.body;
+    const result = await authService.adminPasswordLogin(username, password, deviceId, platform);
+
+    return sendSuccess(res, 200, 'Admin login successful', {
+        user: {
+            id: result.user._id,
+            _id: result.user._id,
+            username: result.user.username,
+            mobile: result.user.mobile,
+            name: result.user.name,
+            email: result.user.email,
+            profilePhoto: result.user.profilePhoto,
+            role: result.user.role,
+        },
+        tokens: result.tokens,
+    });
+});
+
+/**
  * @desc    Logout and revoke active device refresh token
  * @route   POST /api/v1/auth/logout
  * @access  Private
@@ -70,6 +93,7 @@ const logout = catchAsync(async (req, res) => {
 module.exports = {
     sendOtp,
     verifyOtp,
+    adminLogin,
     refreshToken,
     logout,
 };

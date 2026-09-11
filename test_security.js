@@ -82,34 +82,46 @@ async function runSecurityTests() {
 
     // 2. Authentication & Authorization
     console.log('\n--- 2. Authentication & Authorization ---');
+    const OtpVerification = require('./src/models/OtpVerification');
+    const User = require('./src/models/User');
+    const bcrypt = require('bcryptjs');
+
+    const testSalt = await bcrypt.genSalt(10);
+    const testOtpHash = await bcrypt.hash('123456', testSalt);
+
     // Login as normal user (+919876543210)
-    const userOtpRes = await request('/api/v1/auth/send-otp', {
+    await request('/api/v1/auth/send-otp', {
         method: 'POST',
         body: { mobile: '+919876543210' },
     });
-    const userOtp = (userOtpRes.body && userOtpRes.body.data && userOtpRes.body.data.devOtp) || '123456';
+    await OtpVerification.findOneAndUpdate(
+        { mobile: '+919876543210' },
+        { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+    );
     const userAuth = await request('/api/v1/auth/verify-otp', {
         method: 'POST',
-        body: { mobile: '+919876543210', otp: userOtp },
+        body: { mobile: '+919876543210', otp: '123456' },
     });
     assert('Normal user login succeeds', userAuth.status === 200 && userAuth.body.success);
     const userToken = userAuth.body.data && userAuth.body.data.tokens ? userAuth.body.data.tokens.accessToken : null;
 
     // Login as admin (+919999999999)
-    const adminOtpRes = await request('/api/v1/auth/send-otp', {
+    await request('/api/v1/auth/send-otp', {
         method: 'POST',
         body: { mobile: '+919999999999' },
     });
-    const adminOtp = (adminOtpRes.body && adminOtpRes.body.data && adminOtpRes.body.data.devOtp) || '123456';
+    await OtpVerification.findOneAndUpdate(
+        { mobile: '+919999999999' },
+        { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+    );
     const adminAuth = await request('/api/v1/auth/verify-otp', {
         method: 'POST',
-        body: { mobile: '+919999999999', otp: adminOtp },
+        body: { mobile: '+919999999999', otp: '123456' },
     });
     assert('Admin user login succeeds', adminAuth.status === 200 && adminAuth.body.success);
     const adminToken = adminAuth.body.data && adminAuth.body.data.tokens ? adminAuth.body.data.tokens.accessToken : null;
 
     // Ensure +919999999999 has role 'admin'
-    const User = require('./src/models/User');
     if (adminAuth.body.data && adminAuth.body.data.user && adminAuth.body.data.user.role !== 'admin') {
         await User.findByIdAndUpdate(adminAuth.body.data.user._id, { role: 'admin' });
     }
