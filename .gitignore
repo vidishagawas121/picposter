@@ -1,6 +1,24 @@
+# Node modules
 node_modules/
+**/node_modules/
+
+# Environment files
 .env
+**/.env
+!.env.example
+!**/.env.example
+
+# Uploads
 uploads/*
 !uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Build distributions
 dist/
-*.zip
+**/dist/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+*.log

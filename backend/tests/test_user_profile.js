@@ -3,7 +3,7 @@ dns.setServers(['8.8.8.8', '1.1.1.1']);
 const http = require('http');
 const mongoose = require('mongoose');
 require('dotenv').config();
-const connectDB = require('./src/config/db');
+const connectDB = require('../src/config/db');
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
@@ -150,7 +150,7 @@ const runUserProfileTests = async () => {
 
         // If user was previously deactivated during admin tests, ensure isActive is reset to true
         if (!user2VerifyRes.data.data.user.isActive) {
-            const User = require('./src/models/User');
+            const User = require('../src/models/User');
             await User.findByIdAndUpdate(user2VerifyRes.data.data.user._id, { isActive: true });
         }
 

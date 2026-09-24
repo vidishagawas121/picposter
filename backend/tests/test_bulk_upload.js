@@ -6,10 +6,10 @@ dns.setServers(['8.8.8.8', '1.1.1.1']);
 require('dotenv').config();
 
 const BASE_URL = 'http://127.0.0.1:5000';
-const Poster = require('./src/models/Poster');
-const Category = require('./src/models/Category');
-const app = require('./src/app');
-const connectDB = require('./src/config/db');
+const Poster = require('../src/models/Poster');
+const Category = require('../src/models/Category');
+const app = require('../src/app');
+const connectDB = require('../src/config/db');
 
 async function createMultipartBody(fields, files, boundary) {
     const CRLF = '\r\n';
@@ -34,7 +34,7 @@ async function createMultipartBody(fields, files, boundary) {
 }
 
 const jwt = require('jsonwebtoken');
-const User = require('./src/models/User');
+const User = require('../src/models/User');
 
 function sendMultipart(path, bodyBuffer, boundary, token = null) {
     return new Promise((resolve, reject) => {
