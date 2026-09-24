@@ -13,15 +13,25 @@ class AuthService {
      * Generate & send 6-digit cryptographic OTP
      */
     async sendOtp(mobile) {
-        if (!mobile || typeof mobile !== 'string' || !/^\+[1-9]\d{1,14}$/.test(mobile.trim())) {
+        if (!mobile || typeof mobile !== 'string') {
+            throw new AppError('Please provide a valid mobile number', 400, 'INVALID_MOBILE_NUMBER');
+        }
+
+        let normalizedMobile = mobile.trim();
+        // Automatically prefix 10-digit Indian numbers with +91
+        if (/^[6-9]\d{9}$/.test(normalizedMobile)) {
+            normalizedMobile = `+91${normalizedMobile}`;
+        } else if (/^91[6-9]\d{9}$/.test(normalizedMobile)) {
+            normalizedMobile = `+${normalizedMobile}`;
+        }
+
+        if (!/^\+[1-9]\d{9,14}$/.test(normalizedMobile)) {
             throw new AppError(
-                'Please provide a valid E.164 mobile number (e.g. +919876543210)',
+                'Please provide a valid mobile number (e.g. 9876543210 or +919876543210)',
                 400,
                 'INVALID_MOBILE_NUMBER'
             );
         }
-
-        const normalizedMobile = mobile.trim();
 
         // 60-second cooldown check
         const existingOtp = await OtpVerification.findOne({
@@ -50,17 +60,16 @@ class AuthService {
         // Delete any existing OTP records for this mobile number
         await OtpVerification.deleteMany({ mobile: normalizedMobile });
 
-        // Store OTP with 5 minutes TTL
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        // Store OTP with 10 minutes TTL (matching Fast2SMS template)
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await OtpVerification.create({
             mobile: normalizedMobile,
             otpHash,
             expiresAt,
         });
 
-        // Send OTP via SMS
-        const smsMessage = `Your PicPoster login verification code is ${otp}. Valid for 5 minutes.`;
-        await smsService.sendSms(normalizedMobile, smsMessage);
+        // Send OTP via Fast2SMS SMS Gateway
+        await smsService.sendOtpSms(normalizedMobile, otp);
 
         const result = {
             success: true,
@@ -88,7 +97,12 @@ class AuthService {
             throw new AppError('Valid mobile number and OTP are required', 400, 'MISSING_FIELDS');
         }
 
-        const normalizedMobile = mobile.trim();
+        let normalizedMobile = mobile.trim();
+        if (/^[6-9]\d{9}$/.test(normalizedMobile)) {
+            normalizedMobile = `+91${normalizedMobile}`;
+        } else if (/^91[6-9]\d{9}$/.test(normalizedMobile)) {
+            normalizedMobile = `+${normalizedMobile}`;
+        }
 
         const record = await OtpVerification.findOne({
             mobile: normalizedMobile,
