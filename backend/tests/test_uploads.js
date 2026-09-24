@@ -1,10 +1,10 @@
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 const sharp = require('sharp');
-const imageService = require('./src/services/imageService');
+const imageService = require('../src/services/imageService');
 const mongoose = require('mongoose');
-const User = require('./src/models/User');
-const BusinessInfo = require('./src/models/BusinessInfo');
+const User = require('../src/models/User');
+const BusinessInfo = require('../src/models/BusinessInfo');
 require('dotenv').config();
 
 async function testImageProcessing() {

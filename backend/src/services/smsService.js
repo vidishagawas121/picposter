@@ -3,17 +3,39 @@ class SmsService {
      * Send SMS to recipient phone number
      */
     async sendSms(mobile, message) {
-        const provider = process.env.SMS_PROVIDER || 'MOCK';
+        const provider = (process.env.SMS_PROVIDER || 'MOCK').toUpperCase();
+        const apiKey = process.env.FAST2SMS_API_KEY || process.env.SMS_API_KEY;
 
-        if (provider === 'FAST2SMS' && process.env.SMS_API_KEY) {
-            // Fast2SMS integration
+        if (provider === 'FAST2SMS' && apiKey) {
             try {
-                // Dynamic import/fetch if needed, or HTTP post
-                console.log(`[FAST2SMS] Sending to ${mobile}: ${message}`);
+                // Strip +91 country code for Indian numbers as required by Fast2SMS
+                const cleanNumber = mobile.replace(/^\+91/, '').replace(/\D/g, '');
+                const otpMatch = message.match(/\b\d{6}\b/);
+                const otp = otpMatch ? otpMatch[0] : '';
+
+                const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+                    method: 'POST',
+                    headers: {
+                        authorization: apiKey,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        route: 'otp',
+                        variables_values: otp,
+                        numbers: cleanNumber,
+                    }),
+                });
+
+                const data = await response.json();
+                if (data && data.return) {
+                    console.log(`[FAST2SMS] OTP sent successfully to ${cleanNumber}`);
+                } else {
+                    console.error('[FAST2SMS Error Response]', data);
+                }
                 return { success: true };
             } catch (err) {
-                console.error('[FAST2SMS Error]', err.message);
-                throw new Error('Failed to send SMS through gateway');
+                console.error('[FAST2SMS Gateway Error]', err.message);
+                return { success: false, error: err.message };
             }
         }
 

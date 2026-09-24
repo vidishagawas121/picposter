@@ -29,7 +29,7 @@ class ImageService {
         if (req) {
             return `${req.protocol}://${req.get('host')}`;
         }
-        return 'http://localhost:5000';
+        return `http://localhost:${process.env.PORT || 5000}`;
     }
 
     /**

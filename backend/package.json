@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "seed": "node src/utils/seed.js",
-    "test": "node test_uploads.js && node test_bulk_upload.js"
+    "test": "node tests/test_uploads.js && node tests/test_bulk_upload.js"
   },
   "keywords": [],
   "author": "",

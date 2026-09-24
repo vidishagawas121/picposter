@@ -167,12 +167,11 @@ class AuthService {
             isNewUser,
         };
     }
-
-    /**
-     * Issue Access Token (15m) and Refresh Token (30d)
-     */
     async generateTokens(userId, deviceId = '', platform = 'android') {
-        const accessSecret = process.env.JWT_ACCESS_SECRET || 'picposter_super_secret_jwt_access_key_2026';
+        const accessSecret = process.env.JWT_ACCESS_SECRET || (process.env.NODE_ENV !== 'production' ? 'dev_jwt_access_secret_only' : null);
+        if (!accessSecret) {
+            throw new AppError('JWT_ACCESS_SECRET must be configured in environment variables.', 500, 'SERVER_CONFIG_ERROR');
+        }
         const accessExpiry = process.env.JWT_ACCESS_EXPIRY || '15m';
 
         const accessToken = jwt.sign({ userId }, accessSecret, {

@@ -19,6 +19,11 @@ const { sendSuccess } = require('./utils/apiResponse');
 
 const app = express();
 
+// Trust reverse proxy (Nginx) in production for accurate IP detection and rate limiting
+if (process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY) {
+    app.set('trust proxy', process.env.TRUST_PROXY ? (isNaN(process.env.TRUST_PROXY) ? process.env.TRUST_PROXY : Number(process.env.TRUST_PROXY)) : 1);
+}
+
 // Security Headers
 app.use(
     helmet({
@@ -26,12 +31,23 @@ app.use(
     })
 );
 
-// CORS configuration
+// CORS configuration (supports comma-separated origins, * or open for mobile clients)
+const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+    : '*';
+
 app.use(
     cors({
-        origin: '*',
+        origin: (origin, callback) => {
+            // Allow requests with no origin (e.g. mobile Flutter apps, curl, server-to-server)
+            if (!origin || allowedOrigins === '*' || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+            return callback(new AppError(`Origin ${origin} not allowed by CORS policy`, 403, 'CORS_NOT_ALLOWED'));
+        },
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        credentials: true,
     })
 );
 
