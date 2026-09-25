@@ -82,8 +82,8 @@ async function runSecurityTests() {
 
     // 2. Authentication & Authorization
     console.log('\n--- 2. Authentication & Authorization ---');
-    const OtpVerification = require('./src/models/OtpVerification');
-    const User = require('./src/models/User');
+    const OtpVerification = require('../src/models/OtpVerification');
+    const User = require('../src/models/User');
     const bcrypt = require('bcryptjs');
 
     const testSalt = await bcrypt.genSalt(10);
@@ -122,7 +122,6 @@ async function runSecurityTests() {
     const adminToken = adminAuth.body.data && adminAuth.body.data.tokens ? adminAuth.body.data.tokens.accessToken : null;
 
     // Ensure +919999999999 has role 'admin'
-    const User = require('../src/models/User');
     if (adminAuth.body.data && adminAuth.body.data.user && adminAuth.body.data.user.role !== 'admin') {
         await User.findByIdAndUpdate(adminAuth.body.data.user._id, { role: 'admin' });
     }
