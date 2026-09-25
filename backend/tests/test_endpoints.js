@@ -1,4 +1,9 @@
 const http = require('http');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+require('dotenv').config();
+const connectDB = require('./src/config/db');
+const OtpVerification = require('./src/models/OtpVerification');
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
@@ -63,20 +68,30 @@ const runTests = async () => {
     };
 
     try {
+        // Connect to MongoDB
+        await connectDB();
+
         // 1. Health check
         const health = await request('/api/v1/health');
         assert(health.status === 200 && health.data.success === true, '1. Health Check GET /api/v1/health', JSON.stringify(health.data));
 
         // 2. Send OTP
         const testMobile = '+919988776655';
+        const salt = await bcrypt.genSalt(10);
+        const testOtpHash = await bcrypt.hash('123456', salt);
+
         const sendOtpRes = await request('/api/v1/auth/send-otp', 'POST', { mobile: testMobile });
         assert(sendOtpRes.status === 200 && sendOtpRes.data.success === true, '2. Send OTP POST /api/v1/auth/send-otp', JSON.stringify(sendOtpRes.data));
-        const otpCode = sendOtpRes.data.data.devOtp;
+
+        await OtpVerification.findOneAndUpdate(
+            { mobile: testMobile },
+            { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+        );
 
         // 3. Verify OTP
         const verifyRes = await request('/api/v1/auth/verify-otp', 'POST', {
             mobile: testMobile,
-            otp: otpCode,
+            otp: '123456',
             deviceId: 'test_device_1',
             platform: 'android',
         });
@@ -177,13 +192,16 @@ const runTests = async () => {
 
         if (failed === 0) {
             console.log('🎉 ALL BACKEND APIS VERIFIED AND WORKING PERFECTLY!');
+            await mongoose.disconnect();
             process.exit(0);
         } else {
             console.error('⚠️ Some tests failed.');
+            await mongoose.disconnect();
             process.exit(1);
         }
     } catch (err) {
         console.error('Test execution error:', err);
+        await mongoose.disconnect();
         process.exit(1);
     }
 };

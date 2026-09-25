@@ -15,7 +15,7 @@ const apiLimiter = rateLimit({
 });
 
 /**
- * OTP send rate limiter: Max 5 requests per hour per IP / endpoint
+ * OTP send rate limiter: Max 10 requests per hour per IP
  */
 const otpSendLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
@@ -27,7 +27,37 @@ const otpSendLimiter = rateLimit({
     },
 });
 
+/**
+ * OTP verify rate limiter: Max 10 requests per 15 minutes per IP
+ * Prevents brute-force OTP guessing attacks
+ */
+const otpVerifyLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.NODE_ENV === 'production' ? 10 : 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        return sendError(res, 429, 'Too many verification attempts. Please try again later.', 'OTP_VERIFY_RATE_LIMIT');
+    },
+});
+
+/**
+ * Auth endpoint rate limiter: Max 20 requests per minute per IP
+ * Covers refresh-token and other auth endpoints
+ */
+const authLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: process.env.NODE_ENV === 'production' ? 20 : 500,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        return sendError(res, 429, 'Too many authentication requests. Please wait a moment.', 'AUTH_RATE_LIMIT_EXCEEDED');
+    },
+});
+
 module.exports = {
     apiLimiter,
     otpSendLimiter,
+    otpVerifyLimiter,
+    authLimiter,
 };

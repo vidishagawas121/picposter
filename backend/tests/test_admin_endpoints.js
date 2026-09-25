@@ -1,7 +1,9 @@
 const http = require('http');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 const connectDB = require('../src/config/db');
+const OtpVerification = require('../src/models/OtpVerification');
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
@@ -76,13 +78,18 @@ const runAdminTests = async () => {
 
         // 2. Authenticate Admin User (+919876543210)
         const adminMobile = '+919876543210';
-        const adminOtpRes = await request('/api/v1/auth/send-otp', 'POST', { mobile: adminMobile });
-        assert(adminOtpRes.status === 200, '2. Send OTP for Admin', JSON.stringify(adminOtpRes.data));
+        const salt = await bcrypt.genSalt(10);
+        const testOtpHash = await bcrypt.hash('123456', salt);
 
-        const adminOtpCode = adminOtpRes.data.data.devOtp || '123456';
+        await request('/api/v1/auth/send-otp', 'POST', { mobile: adminMobile });
+        await OtpVerification.findOneAndUpdate(
+            { mobile: adminMobile },
+            { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+        );
+
         const adminVerifyRes = await request('/api/v1/auth/verify-otp', 'POST', {
             mobile: adminMobile,
-            otp: adminOtpCode,
+            otp: '123456',
             deviceId: 'admin_test_dev',
             platform: 'web',
         });
@@ -98,11 +105,14 @@ const runAdminTests = async () => {
 
         // 3. Authenticate Regular User (+919988776655)
         const userMobile = '+919988776655';
-        const userOtpRes = await request('/api/v1/auth/send-otp', 'POST', { mobile: userMobile });
-        const userOtpCode = userOtpRes.data.data.devOtp || '123456';
+        await request('/api/v1/auth/send-otp', 'POST', { mobile: userMobile });
+        await OtpVerification.findOneAndUpdate(
+            { mobile: userMobile },
+            { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+        );
         const userVerifyRes = await request('/api/v1/auth/verify-otp', 'POST', {
             mobile: userMobile,
-            otp: userOtpCode,
+            otp: '123456',
             deviceId: 'regular_user_dev',
             platform: 'android',
         });

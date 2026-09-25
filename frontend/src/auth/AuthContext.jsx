@@ -37,6 +37,30 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  const loginWithPassword = async (username, password) => {
+    const res = await authApi.adminLogin({
+      username,
+      password,
+      deviceId: 'web_admin_dashboard',
+      platform: 'web',
+    });
+
+    if (res.data?.success) {
+      const { user: authUser, tokens } = res.data.data;
+      if (authUser.role !== 'admin') {
+        throw new Error('Access denied. Admin privileges required.');
+      }
+
+      setUser(authUser);
+      setToken(tokens.accessToken);
+      localStorage.setItem('picposter_access_token', tokens.accessToken);
+      localStorage.setItem('picposter_refresh_token', tokens.refreshToken);
+      localStorage.setItem('picposter_admin_user', JSON.stringify(authUser));
+      return authUser;
+    }
+    throw new Error(res.data?.message || 'Login failed');
+  };
+
   const loginWithOtp = async (mobile, otp) => {
     const res = await authApi.verifyOtp({
       mobile,
@@ -85,6 +109,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     isAuthenticated: !!token && !!user && user.role === 'admin',
     isAdmin: user?.role === 'admin',
+    loginWithPassword,
     sendOtp,
     loginWithOtp,
     logout,

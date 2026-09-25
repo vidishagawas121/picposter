@@ -5,8 +5,12 @@ const AppError = require('../utils/appError');
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    // Permissive image check: allow any image MIME type, application/octet-stream, or standard image extensions
+    const isImageMime = file.mimetype && file.mimetype.toLowerCase().startsWith('image/');
+    const isOctetStream = file.mimetype === 'application/octet-stream';
+    const hasImageExt = /\.(jpe?g|png|webp|gif|bmp|heic|heif|svg)$/i.test(file.originalname || '');
+
+    if (isImageMime || isOctetStream || hasImageExt) {
         cb(null, true);
     } else {
         cb(
@@ -23,7 +27,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage,
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB limit
+        fileSize: 15 * 1024 * 1024, // 15MB limit
     },
     fileFilter,
 });

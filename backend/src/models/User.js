@@ -10,6 +10,17 @@ const userSchema = new mongoose.Schema(
             trim: true,
             match: [/^\+[1-9]\d{1,14}$/, 'Please provide a valid E.164 phone number (e.g. +919876543210)'],
         },
+        username: {
+            type: String,
+            unique: true,
+            sparse: true,
+            trim: true,
+            lowercase: true,
+        },
+        password: {
+            type: String,
+            select: false,
+        },
         name: {
             type: String,
             default: 'User',

@@ -13,6 +13,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const { protect } = require('./middlewares/authMiddleware');
 const adminGuard = require('./middlewares/adminGuard');
 const { apiLimiter } = require('./middlewares/rateLimiter');
+const { requestIdMiddleware, requestLogger } = require('./middlewares/requestLogger');
 const errorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
 const { sendSuccess } = require('./utils/apiResponse');
@@ -31,23 +32,33 @@ app.use(
     })
 );
 
-// Dynamic CORS configuration
-const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
-    : '*';
+// Request ID & Logging
+app.use(requestIdMiddleware);
+app.use(requestLogger);
+
+// Dynamic CORS configuration - supports CORS_ALLOWED_ORIGINS and CORS_ORIGIN
+const corsEnv = process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ORIGIN || '*';
+const allowedOrigins = corsEnv
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
 
 app.use(
     cors({
         origin: (origin, callback) => {
-            // Allow server-to-server, mobile app, curl (no origin header)
+            // Allow requests with no origin (mobile apps, curl, server-to-server)
             if (!origin) return callback(null, true);
-            if (allowedOrigins === '*' || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+            // In development or wildcard, allow all
+            if (process.env.NODE_ENV !== 'production' || allowedOrigins.includes('*')) {
+                return callback(null, true);
+            }
+            if (allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
             return callback(new AppError(`Origin ${origin} not allowed by CORS`, 403, 'CORS_NOT_ALLOWED'));
         },
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
         credentials: true,
     })
 );
@@ -56,19 +67,30 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files (uploads for avatar photos, business logos, posters)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Static files (uploads) - disable directory listing
+app.use(
+    '/uploads',
+    express.static(path.join(__dirname, '../uploads'), {
+        dotfiles: 'deny',
+        index: false,
+    })
+);
 
 // General API rate limiter
 app.use('/api/', apiLimiter);
 
-// Health check endpoint
+// Health check endpoint (safe for production)
 app.get('/api/v1/health', (req, res) => {
-    return sendSuccess(res, 200, 'PicPoster Backend is running smoothly', {
+    const healthData = {
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-    });
+    };
+
+    if (process.env.NODE_ENV !== 'production') {
+        healthData.environment = process.env.NODE_ENV || 'development';
+    }
+
+    return sendSuccess(res, 200, 'PicPoster Backend is running smoothly', healthData);
 });
 
 // API Routes

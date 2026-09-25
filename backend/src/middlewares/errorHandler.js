@@ -70,19 +70,24 @@ const errorHandler = (err, req, res, next) => {
         message = 'Uploaded image is corrupted or in an unsupported format. Please upload a valid JPEG, PNG, or WebP image.';
     }
 
-    // Mask non-operational 500 errors in production to prevent information leakage
-    if (statusCode === 500 && process.env.NODE_ENV === 'production' && !err.isOperational) {
-        message = 'Internal server error. Please try again later.';
-        errorCode = 'INTERNAL_SERVER_ERROR';
-        errors = [];
+    // Log ALL server errors (500+) regardless of environment for debugging
+    if (statusCode >= 500) {
+        console.error(`[ERROR ${statusCode}] [${req.requestId || '-'}] ${req.method} ${req.originalUrl}`, {
+            errorCode,
+            message: err.message,
+            stack: err.stack,
+            userId: req.user ? req.user._id : null,
+        });
     }
 
-    if (process.env.NODE_ENV === 'development' && statusCode === 500) {
-        console.error(`[SERVER ERROR ${statusCode}]`, err);
+    // Mask non-operational 500 errors in production to prevent information leakage
+    if (statusCode === 500 && process.env.NODE_ENV === 'production' && !err.isOperational) {
+        message = 'Something went wrong. Please try again later.';
+        errorCode = 'INTERNAL_SERVER_ERROR';
+        errors = [];
     }
 
     return sendError(res, statusCode, message, errorCode, errors);
 };
 
 module.exports = errorHandler;
-
