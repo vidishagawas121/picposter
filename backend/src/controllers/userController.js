@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const UserCreation = require('../models/UserCreation');
 const Poster = require('../models/Poster');
@@ -202,25 +203,46 @@ const getSavedTemplates = catchAsync(async (req, res) => {
 /**
  * @desc    Save / bookmark a template
  * @route   POST /api/v1/user/saved-templates/:id
- * @access  Private
  */
 const saveTemplate = catchAsync(async (req, res, next) => {
     const posterId = req.params.id;
+    const body = req.body || {};
+    const query = req.query || {};
+    const imageUrl = body.imageUrl || query.imageUrl || (typeof posterId === 'string' && posterId.startsWith('http') ? posterId : null);
+    const title = body.title || query.title || 'Saved Template';
+    const category = body.category || query.category || 'General';
 
-    const poster = await Poster.findById(posterId);
+    let poster = null;
+    if (mongoose.Types.ObjectId.isValid(posterId)) {
+        poster = await Poster.findById(posterId);
+    }
+    if (!poster && imageUrl) {
+        poster = await Poster.findOne({ imageUrl });
+    }
+    if (!poster && imageUrl) {
+        poster = await Poster.create({
+            title,
+            imageUrl,
+            category,
+            language: req.body.language || 'English',
+        });
+    }
+
     if (!poster) {
         return next(new AppError('Poster template not found', 404, 'POSTER_NOT_FOUND'));
     }
 
     const user = await User.findById(req.user._id);
+    const targetId = poster._id;
 
-    if (!user.savedTemplates.includes(posterId)) {
-        user.savedTemplates.push(posterId);
+    if (!user.savedTemplates.some((id) => id.toString() === targetId.toString())) {
+        user.savedTemplates.push(targetId);
         await user.save();
     }
 
     return sendSuccess(res, 200, 'Template saved to bookmarks', {
         savedTemplates: user.savedTemplates,
+        poster,
     });
 });
 
@@ -231,10 +253,17 @@ const saveTemplate = catchAsync(async (req, res, next) => {
  */
 const unsaveTemplate = catchAsync(async (req, res) => {
     const posterId = req.params.id;
+    const imageUrl = req.body?.imageUrl || req.query?.imageUrl;
+
+    let targetId = posterId;
+    if (!mongoose.Types.ObjectId.isValid(posterId) && imageUrl) {
+        const poster = await Poster.findOne({ imageUrl });
+        if (poster) targetId = poster._id;
+    }
 
     const user = await User.findByIdAndUpdate(
         req.user._id,
-        { $pull: { savedTemplates: posterId } },
+        { $pull: { savedTemplates: targetId } },
         { new: true }
     );
 

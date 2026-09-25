@@ -2,8 +2,10 @@ const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 const http = require('http');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 const connectDB = require('../src/config/db');
+const OtpVerification = require('../src/models/OtpVerification');
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
@@ -81,11 +83,16 @@ const runUserProfileTests = async () => {
 
         // --- 2. Authenticate User 1 (+919988776601) ---
         const user1Mobile = '+919988776601';
-        const user1OtpRes = await request('/api/v1/auth/send-otp', 'POST', { mobile: user1Mobile });
-        const user1OtpCode = user1OtpRes.data.data.devOtp || '123456';
+        await request('/api/v1/auth/send-otp', 'POST', { mobile: user1Mobile });
+        const salt = await bcrypt.genSalt(10);
+        const testOtpHash = await bcrypt.hash('123456', salt);
+        await OtpVerification.findOneAndUpdate(
+            { mobile: user1Mobile },
+            { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+        );
         const user1VerifyRes = await request('/api/v1/auth/verify-otp', 'POST', {
             mobile: user1Mobile,
-            otp: user1OtpCode,
+            otp: '123456',
             deviceId: 'device_user_1',
             platform: 'android',
         });
@@ -137,11 +144,14 @@ const runUserProfileTests = async () => {
 
         // --- 7. Authenticate User 2 (+919988776602) ---
         const user2Mobile = '+919988776602';
-        const user2OtpRes = await request('/api/v1/auth/send-otp', 'POST', { mobile: user2Mobile });
-        const user2OtpCode = user2OtpRes.data.data.devOtp || '123456';
+        await request('/api/v1/auth/send-otp', 'POST', { mobile: user2Mobile });
+        await OtpVerification.findOneAndUpdate(
+            { mobile: user2Mobile },
+            { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+        );
         const user2VerifyRes = await request('/api/v1/auth/verify-otp', 'POST', {
             mobile: user2Mobile,
-            otp: user2OtpCode,
+            otp: '123456',
             deviceId: 'device_user_2',
             platform: 'android',
         });
@@ -188,10 +198,14 @@ const runUserProfileTests = async () => {
         );
 
         // --- 11. Persistence Check: User 2 Re-login ---
-        const user2ReloginOtpRes = await request('/api/v1/auth/send-otp', 'POST', { mobile: user2Mobile });
+        await request('/api/v1/auth/send-otp', 'POST', { mobile: user2Mobile });
+        await OtpVerification.findOneAndUpdate(
+            { mobile: user2Mobile },
+            { otpHash: testOtpHash, isUsed: false, expiresAt: new Date(Date.now() + 300000), attempts: 0 }
+        );
         const user2ReloginVerifyRes = await request('/api/v1/auth/verify-otp', 'POST', {
             mobile: user2Mobile,
-            otp: user2ReloginOtpRes.data.data.devOtp || '123456',
+            otp: '123456',
             deviceId: 'device_user_2_b',
             platform: 'android',
         });

@@ -40,6 +40,7 @@ class ImageService {
         const outputPath = path.join(this.baseUploadDir, 'users', filename);
 
         await sharp(fileBuffer)
+            .rotate()
             .resize(500, 500, {
                 fit: 'cover',
                 withoutEnlargement: true,
@@ -59,6 +60,7 @@ class ImageService {
         const outputPath = path.join(this.baseUploadDir, 'business', filename);
 
         await sharp(fileBuffer)
+            .rotate()
             .resize(800, 800, {
                 fit: 'inside',
                 withoutEnlargement: true,

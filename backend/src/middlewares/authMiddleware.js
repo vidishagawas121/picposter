@@ -17,9 +17,9 @@ const protect = catchAsync(async (req, res, next) => {
         return next(new AppError('Authentication required. Please provide a valid bearer token.', 401, 'UNAUTHORIZED'));
     }
 
-    const secret = process.env.JWT_ACCESS_SECRET || (process.env.NODE_ENV !== 'production' ? 'dev_jwt_access_secret_only' : null);
+    const secret = process.env.JWT_ACCESS_SECRET;
     if (!secret) {
-        return next(new AppError('Server configuration error: JWT_ACCESS_SECRET is missing.', 500, 'SERVER_CONFIG_ERROR'));
+        return next(new AppError('Server configuration error: JWT_ACCESS_SECRET is missing.', 500, 'CONFIG_ERROR'));
     }
 
     const decoded = jwt.verify(token, secret);
@@ -52,9 +52,9 @@ const optionalAuth = catchAsync(async (req, res, next) => {
     }
 
     try {
-        const secret = process.env.JWT_ACCESS_SECRET || (process.env.NODE_ENV !== 'production' ? 'dev_jwt_access_secret_only' : null);
+        const secret = process.env.JWT_ACCESS_SECRET;
         if (!secret) {
-            return next(new AppError('Server configuration error: JWT_ACCESS_SECRET is missing.', 500, 'SERVER_CONFIG_ERROR'));
+            return next();
         }
         const decoded = jwt.verify(token, secret);
         const currentUser = await User.findById(decoded.userId);

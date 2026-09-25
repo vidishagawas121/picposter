@@ -1,6 +1,7 @@
 import axiosInstance from './axiosInstance';
 
 export const authApi = {
+  adminLogin: (credentials) => axiosInstance.post('/auth/admin-login', credentials),
   sendOtp: (mobile) => axiosInstance.post('/auth/send-otp', { mobile }),
   verifyOtp: (payload) => axiosInstance.post('/auth/verify-otp', payload),
   refreshToken: (payload) => axiosInstance.post('/auth/refresh-token', payload),
