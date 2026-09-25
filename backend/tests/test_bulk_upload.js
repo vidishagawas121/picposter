@@ -99,7 +99,7 @@ async function runBulkUploadTest() {
             });
         }
 
-        const secret = process.env.JWT_ACCESS_SECRET || 'picposter_super_secret_jwt_access_key_2026';
+        const secret = process.env.JWT_ACCESS_SECRET;
         const adminToken = jwt.sign({ userId: adminUser._id }, secret, { expiresIn: '1h' });
         // Ensure test category exists
         let testCat = await Category.findOne({ slug: 'festival' });

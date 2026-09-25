@@ -1,5 +1,8 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
-export const ADMIN_API_BASE_URL = import.meta.env.VITE_ADMIN_API_BASE_URL || 'http://localhost:5000/api/v1/admin';
+const isDev = import.meta.env.DEV;
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:5000/api/v1' : '/api/v1');
+export const ADMIN_API_BASE_URL =
+  import.meta.env.VITE_ADMIN_API_BASE_URL || (isDev ? 'http://localhost:5000/api/v1/admin' : '/api/v1/admin');
 
 export const LANGUAGES = [
   'English',

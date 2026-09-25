@@ -17,7 +17,10 @@ const protect = catchAsync(async (req, res, next) => {
         return next(new AppError('Authentication required. Please provide a valid bearer token.', 401, 'UNAUTHORIZED'));
     }
 
-    const secret = process.env.JWT_ACCESS_SECRET || 'picposter_super_secret_jwt_access_key_2026';
+    const secret = process.env.JWT_ACCESS_SECRET;
+    if (!secret) {
+        return next(new AppError('Server configuration error: JWT_ACCESS_SECRET is missing.', 500, 'CONFIG_ERROR'));
+    }
 
     const decoded = jwt.verify(token, secret);
 
@@ -49,7 +52,10 @@ const optionalAuth = catchAsync(async (req, res, next) => {
     }
 
     try {
-        const secret = process.env.JWT_ACCESS_SECRET || 'picposter_super_secret_jwt_access_key_2026';
+        const secret = process.env.JWT_ACCESS_SECRET;
+        if (!secret) {
+            return next();
+        }
         const decoded = jwt.verify(token, secret);
         const currentUser = await User.findById(decoded.userId);
         if (currentUser && currentUser.isActive) {

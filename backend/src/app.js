@@ -19,6 +19,11 @@ const { sendSuccess } = require('./utils/apiResponse');
 
 const app = express();
 
+// Trust proxy behind Nginx/reverse proxy
+if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true' || process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+}
+
 // Security Headers
 app.use(
     helmet({
@@ -26,12 +31,24 @@ app.use(
     })
 );
 
-// CORS configuration
+// Dynamic CORS configuration
+const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : '*';
+
 app.use(
     cors({
-        origin: '*',
+        origin: (origin, callback) => {
+            // Allow server-to-server, mobile app, curl (no origin header)
+            if (!origin) return callback(null, true);
+            if (allowedOrigins === '*' || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+            return callback(new AppError(`Origin ${origin} not allowed by CORS`, 403, 'CORS_NOT_ALLOWED'));
+        },
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: true,
     })
 );
 
