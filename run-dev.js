@@ -1,5 +1,13 @@
 const { spawn, execSync } = require('child_process');
 const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables from backend/.env or root .env
+dotenv.config({ path: path.join(__dirname, 'backend/.env') });
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const backendPort = parseInt(process.env.PORT, 10) || 5000;
+const frontendPort = parseInt(process.env.VITE_PORT, 10) || 3000;
 
 // Automatically free ports before launching if any orphaned process is lingering
 function freePort(port) {
@@ -24,14 +32,14 @@ function freePort(port) {
     }
 }
 
-// Clean ports 5000 and 3000 before startup
-freePort(5000);
-freePort(3000);
+// Clean ports before startup based on .env
+freePort(backendPort);
+freePort(frontendPort);
 
 console.log('\x1b[36m%s\x1b[0m', '══════════════════════════════════════════════════════════════');
 console.log('\x1b[36m%s\x1b[0m', '  🚀 Starting PicPoster Fullstack Application (Dev Mode)');
-console.log('\x1b[36m%s\x1b[0m', '  • Backend API:      http://localhost:5000');
-console.log('\x1b[36m%s\x1b[0m', '  • Frontend UI:       http://localhost:3000');
+console.log('\x1b[36m%s\x1b[0m', `  • Backend API:      http://localhost:${backendPort} (from .env)`);
+console.log('\x1b[36m%s\x1b[0m', `  • Frontend UI:       http://localhost:${frontendPort} (from .env)`);
 console.log('\x1b[36m%s\x1b[0m', '══════════════════════════════════════════════════════════════\n');
 
 // 1. Spawn Backend

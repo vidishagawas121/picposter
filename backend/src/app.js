@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const path = require('path');
+const mongoose = require('mongoose');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -20,19 +22,23 @@ const { sendSuccess } = require('./utils/apiResponse');
 
 const app = express();
 
-// Trust proxy behind Nginx/reverse proxy
+// Trust reverse proxy (Nginx, ALB, Cloudflare)
 if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true' || process.env.NODE_ENV === 'production') {
     app.set('trust proxy', 1);
 }
 
-// Security Headers
+// Security Headers with Helmet
 app.use(
     helmet({
         crossOriginResourcePolicy: { policy: 'cross-origin' },
+        crossOriginEmbedderPolicy: false,
     })
 );
 
-// Request ID & Logging
+// Gzip response compression
+app.use(compression());
+
+// Request ID & Structured Logging
 app.use(requestIdMiddleware);
 app.use(requestLogger);
 
@@ -73,25 +79,44 @@ app.use(
     express.static(path.join(__dirname, '../uploads'), {
         dotfiles: 'deny',
         index: false,
+        maxAge: process.env.NODE_ENV === 'production' ? '7d' : '0',
     })
 );
 
 // General API rate limiter
 app.use('/api/', apiLimiter);
 
-// Health check endpoint (safe for production)
-app.get('/api/v1/health', (req, res) => {
+// Health check handler (Used by load balancers, PM2, Docker, UptimeRobot)
+const healthCheckHandler = (req, res) => {
+    const isDbConnected = mongoose.connection.readyState === 1;
+    const dbStateNames = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+    const dbState = dbStateNames[mongoose.connection.readyState] || 'unknown';
+
     const healthData = {
-        uptime: process.uptime(),
+        status: isDbConnected ? 'healthy' : 'degraded',
+        database: {
+            status: dbState,
+            connected: isDbConnected,
+        },
+        uptime: Math.floor(process.uptime()),
         timestamp: new Date().toISOString(),
+        memoryUsage: {
+            rssMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
+            heapUsedMb: Math.round(process.memoryUsage().heapUsed / (1024 * 1024)),
+        },
     };
 
     if (process.env.NODE_ENV !== 'production') {
         healthData.environment = process.env.NODE_ENV || 'development';
     }
 
-    return sendSuccess(res, 200, 'PicPoster Backend is running smoothly', healthData);
-});
+    const statusCode = isDbConnected ? 200 : 503;
+    return sendSuccess(res, statusCode, `PicPoster API is ${healthData.status}`, healthData);
+};
+
+// Expose health routes for load balancers and clients
+app.get('/health', healthCheckHandler);
+app.get('/api/v1/health', healthCheckHandler);
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);

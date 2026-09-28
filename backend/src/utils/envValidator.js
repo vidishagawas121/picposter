@@ -1,17 +1,17 @@
 /**
  * Environment Variable Validator
- * Runs at server startup to ensure all required configuration is present.
- * Fails fast with clear error messages if critical variables are missing.
+ * Runs at server startup to ensure all required configuration is present in .env.
+ * Fails fast with clear error messages if critical variables like PORT or secrets are missing.
  */
 
 const REQUIRED_VARS = [
+    { name: 'PORT', description: 'Server port number (from .env)' },
     { name: 'MONGO_URI', description: 'MongoDB connection string' },
     { name: 'JWT_ACCESS_SECRET', description: 'JWT access token signing secret', minLength: 32 },
     { name: 'JWT_REFRESH_SECRET', description: 'JWT refresh token signing secret', minLength: 32 },
 ];
 
 const OPTIONAL_VARS = [
-    { name: 'PORT', default: '5000' },
     { name: 'NODE_ENV', default: 'development' },
     { name: 'API_BASE_URL', default: 'http://localhost:5000' },
     { name: 'CORS_ALLOWED_ORIGINS', default: '*' },
@@ -33,14 +33,21 @@ const validateEnv = () => {
     for (const v of REQUIRED_VARS) {
         const value = process.env[v.name];
 
-        if (!value || value.trim().length === 0) {
-            errors.push(`  ✗ ${v.name} is required (${v.description})`);
+        if (!value || value.toString().trim().length === 0) {
+            errors.push(`  ✗ ${v.name} is required in .env (${v.description})`);
             continue;
+        }
+
+        if (v.name === 'PORT') {
+            const portNum = parseInt(value, 10);
+            if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+                errors.push(`  ✗ PORT in .env must be a valid integer between 1 and 65535 (received: "${value}")`);
+            }
         }
 
         if (v.minLength && value.trim().length < v.minLength) {
             errors.push(
-                `  ✗ ${v.name} must be at least ${v.minLength} characters for security (current: ${value.length})`
+                `  ✗ ${v.name} in .env must be at least ${v.minLength} characters for security (current: ${value.length})`
             );
         }
     }
@@ -49,14 +56,14 @@ const validateEnv = () => {
     const accessSecret = process.env.JWT_ACCESS_SECRET || '';
     if (accessSecret.includes('picposter_super_secret')) {
         errors.push(
-            `  ✗ JWT_ACCESS_SECRET is using the default insecure value. Generate a strong secret: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+            `  ✗ JWT_ACCESS_SECRET in .env is using the default insecure value. Generate a strong secret: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
         );
     }
 
     const refreshSecret = process.env.JWT_REFRESH_SECRET || '';
     if (refreshSecret.includes('picposter_super_secret')) {
         errors.push(
-            `  ✗ JWT_REFRESH_SECRET is using the default insecure value. Generate a strong secret: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+            `  ✗ JWT_REFRESH_SECRET in .env is using the default insecure value. Generate a strong secret: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
         );
     }
 
@@ -71,11 +78,11 @@ const validateEnv = () => {
 
         if (isProduction) {
             console.error('⛔ Cannot start in production mode with invalid configuration.');
-            console.error('   Fix the above errors and restart.\n');
+            console.error('   Fix the above errors in .env and restart.\n');
             process.exit(1);
         } else {
             console.warn('⚠️  Running in development mode with configuration warnings.');
-            console.warn('   These MUST be fixed before deploying to production.\n');
+            console.warn('   Ensure these are correctly set in .env.\n');
         }
     }
 

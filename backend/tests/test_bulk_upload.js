@@ -3,7 +3,10 @@ const sharp = require('sharp');
 const mongoose = require('mongoose');
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const BASE_URL = 'http://127.0.0.1:5000';
 const Poster = require('../src/models/Poster');

@@ -5,7 +5,10 @@ const imageService = require('../src/services/imageService');
 const mongoose = require('mongoose');
 const User = require('../src/models/User');
 const BusinessInfo = require('../src/models/BusinessInfo');
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 async function testImageProcessing() {
     console.log('🖼️  Testing Image Processing Pipeline (Sharp + WebP)...');

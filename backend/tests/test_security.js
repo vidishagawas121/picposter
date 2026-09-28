@@ -1,6 +1,9 @@
 const http = require('http');
 const mongoose = require('mongoose');
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 const connectDB = require('../src/config/db');
 
 const BASE_URL = 'http://127.0.0.1:5000';

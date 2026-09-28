@@ -1,9 +1,12 @@
 const http = require('http');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
-const connectDB = require('./src/config/db');
-const OtpVerification = require('./src/models/OtpVerification');
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+const connectDB = require('../src/config/db');
+const OtpVerification = require('../src/models/OtpVerification');
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
