@@ -32,7 +32,7 @@ mkdir -p backend/logs
 
 # 5. Reload backend cluster with PM2 (zero-downtime)
 echo "🔄 Reloading PM2 backend cluster..."
-if pm2 describe picposter-backend > /dev/null 2>&1; then
+if pm2 describe picposter-admin-backend > /dev/null 2>&1; then
     pm2 reload ecosystem.config.js --env production
 else
     pm2 start ecosystem.config.js --env production
@@ -46,7 +46,7 @@ if curl -s -f http://localhost:5000/health > /dev/null; then
     echo "✅ Backend is healthy and serving traffic!"
 else
     echo "⚠️ Warning: Health check failed on http://localhost:5000/health. Check PM2 logs:"
-    pm2 logs picposter-backend --lines 20 --nostream
+    pm2 logs picposter-admin-backend --lines 20 --nostream
 fi
 
 echo "🎉 Deployment completed successfully!"

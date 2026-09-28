@@ -15,7 +15,7 @@
     "test": "npm --prefix backend test",
     "pm2:start": "pm2 start ecosystem.config.js --env production",
     "pm2:reload": "pm2 reload ecosystem.config.js --env production",
-    "pm2:logs": "pm2 logs picposter-backend",
+    "pm2:logs": "pm2 logs picposter-admin-backend",
     "pm2:stop": "pm2 stop ecosystem.config.js",
     "deploy": "bash deploy.sh"
   }

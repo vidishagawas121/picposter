@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   apps: [
     {
-      name: 'picposter-backend',
+      name: 'picposter-admin-backend',
       script: 'src/server.js',
       cwd: path.join(__dirname, 'backend'),
       instances: 'max',

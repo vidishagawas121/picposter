@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'picposter-backend',
+      name: 'picposter-admin-backend',
       script: 'src/server.js',
       cwd: __dirname,
       instances: 'max',
