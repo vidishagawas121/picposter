@@ -61,7 +61,8 @@ const refreshToken = catchAsync(async (req, res) => {
  */
 const adminLogin = catchAsync(async (req, res) => {
     const { username, password, deviceId, platform } = req.body;
-    const result = await authService.adminPasswordLogin(username, password, deviceId, platform);
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'client_ip';
+    const result = await authService.adminPasswordLogin(username, password, deviceId, platform, clientIp);
 
     return sendSuccess(res, 200, 'Admin login successful', {
         user: {

@@ -87,7 +87,7 @@ const errorHandler = (err, req, res, next) => {
         errors = [];
     }
 
-    return sendError(res, statusCode, message, errorCode, errors);
+    return sendError(res, statusCode, message, errorCode, errors, err.data);
 };
 
 module.exports = errorHandler;

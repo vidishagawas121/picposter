@@ -21,13 +21,19 @@ const sendSuccess = (res, statusCode = 200, message = 'Operation completed succe
 /**
  * Sends a standardized error response.
  */
-const sendError = (res, statusCode = 500, message = 'An error occurred', errorCode = 'INTERNAL_ERROR', errors = []) => {
-    return res.status(statusCode).json({
+const sendError = (res, statusCode = 500, message = 'An error occurred', errorCode = 'INTERNAL_ERROR', errors = [], data = null) => {
+    const responsePayload = {
         success: false,
         message,
         errorCode,
         errors,
-    });
+    };
+
+    if (data !== null && data !== undefined) {
+        responsePayload.data = data;
+    }
+
+    return res.status(statusCode).json(responsePayload);
 };
 
 module.exports = {

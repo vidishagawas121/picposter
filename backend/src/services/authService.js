@@ -8,6 +8,56 @@ const BusinessInfo = require('../models/BusinessInfo');
 const smsService = require('./smsService');
 const AppError = require('../utils/appError');
 
+// Rate limiting & lockout for failed admin password login attempts
+// Maximum 5 failed attempts per client IP within 15 minutes window
+const failedPasswordAttempts = new Map();
+
+function getLockoutStatus(clientKey) {
+    const now = Date.now();
+    const record = failedPasswordAttempts.get(clientKey);
+    if (!record) return null;
+
+    if (record.lockoutUntil && record.lockoutUntil > now) {
+        const remainingSeconds = Math.ceil((record.lockoutUntil - now) / 1000);
+        return { isLocked: true, remainingSeconds, lockoutUntil: record.lockoutUntil };
+    }
+
+    if (record.lockoutUntil && record.lockoutUntil <= now) {
+        failedPasswordAttempts.delete(clientKey);
+        return null;
+    }
+
+    if (record.firstAttempt && now - record.firstAttempt > 15 * 60 * 1000) {
+        failedPasswordAttempts.delete(clientKey);
+        return null;
+    }
+
+    return null;
+}
+
+function recordFailedLogin(clientKey) {
+    const now = Date.now();
+    let record = failedPasswordAttempts.get(clientKey);
+    if (!record || (record.firstAttempt && now - record.firstAttempt > 15 * 60 * 1000)) {
+        record = { count: 1, firstAttempt: now, lockoutUntil: null };
+    } else {
+        record.count += 1;
+    }
+
+    if (record.count >= 5) {
+        record.lockoutUntil = now + 15 * 60 * 1000; // 15-minute lockout
+        failedPasswordAttempts.set(clientKey, record);
+        return { isLocked: true, remainingSeconds: 900, lockoutUntil: record.lockoutUntil };
+    }
+
+    failedPasswordAttempts.set(clientKey, record);
+    return { isLocked: false, count: record.count, remainingAttempts: 5 - record.count };
+}
+
+function clearFailedLogin(clientKey) {
+    failedPasswordAttempts.delete(clientKey);
+}
+
 class AuthService {
     /**
      * Generate & send 6-digit cryptographic OTP
@@ -69,7 +119,7 @@ class AuthService {
         });
 
         // Send OTP via SMS
-        const smsMessage = `Your PicPoster login verification code is ${otp}. Valid for 5 minutes.`;
+        const smsMessage = `Your OTP for logging in to the Pic Poster application is ${otp}. It is valid for 10 minutes. Do not share this OTP with anyone. - PicPoster (by Fourise)`;
         await smsService.sendSms(normalizedMobile, smsMessage, { otp });
 
         const result = {
@@ -108,21 +158,29 @@ class AuthService {
         const record = await OtpVerification.findOne({
             mobile: normalizedMobile,
             isUsed: false,
-            expiresAt: { $gt: new Date() },
         });
 
         if (!record) {
             throw new AppError(
                 'OTP expired or not found. Please request a new one.',
                 400,
-                'INVALID_OTP'
+                'OTP_EXPIRED'
+            );
+        }
+
+        if (record.expiresAt < new Date()) {
+            await OtpVerification.deleteOne({ _id: record._id });
+            throw new AppError(
+                'OTP has expired. Please request a new verification code.',
+                400,
+                'OTP_EXPIRED'
             );
         }
 
         if (record.attempts >= 5) {
             await OtpVerification.deleteOne({ _id: record._id });
             throw new AppError(
-                'Maximum verification attempts exceeded. Please request a new OTP.',
+                'Too many incorrect attempts. OTP has been invalidated. Please request a new OTP.',
                 400,
                 'MAX_ATTEMPTS_EXCEEDED'
             );
@@ -133,8 +191,16 @@ class AuthService {
             record.attempts += 1;
             await record.save();
             const remaining = 5 - record.attempts;
+            if (remaining <= 0) {
+                await OtpVerification.deleteOne({ _id: record._id });
+                throw new AppError(
+                    'Too many incorrect attempts. OTP has been invalidated. Please request a new OTP.',
+                    400,
+                    'MAX_ATTEMPTS_EXCEEDED'
+                );
+            }
             throw new AppError(
-                `Invalid OTP code. ${remaining} attempt(s) remaining.`,
+                `Incorrect OTP. ${remaining} attempt(s) remaining.`,
                 400,
                 'INVALID_OTP'
             );
@@ -144,12 +210,7 @@ class AuthService {
         record.isUsed = true;
         await record.save();
 
-        // Check if user exists or register
-        const adminMobiles = (process.env.ADMIN_MOBILES || '+919876543210')
-            .split(',')
-            .map((m) => m.trim());
-        const isAdmin = adminMobiles.includes(normalizedMobile);
-
+        // Check if user exists or register (USER AUTHENTICATION ONLY - Admin never uses OTP)
         let user = await User.findOne({ mobile: normalizedMobile });
         let isNewUser = false;
 
@@ -158,8 +219,8 @@ class AuthService {
             user = await User.create({
                 mobile: normalizedMobile,
                 isVerified: true,
-                role: isAdmin ? 'admin' : 'user',
-                name: isAdmin ? 'Admin' : 'User',
+                role: 'user',
+                name: 'User',
                 lastLoginAt: new Date(),
             });
 
@@ -169,9 +230,6 @@ class AuthService {
             });
         } else {
             user.isVerified = true;
-            if (isAdmin && user.role !== 'admin') {
-                user.role = 'admin';
-            }
             user.lastLoginAt = new Date();
             await user.save();
 
@@ -265,71 +323,88 @@ class AuthService {
         return newTokens;
     }
 
+
+
     /**
-     * Admin login with Username/Email/Mobile and Password
-     * @param {string} username - Admin username (e.g. 'admin'), email, or mobile
-     * @param {string} password - Admin password (e.g. 'admin@123')
+     * Admin login strictly with Username/Email and Password (NEVER uses OTP)
+     * Configured Admin Account:
+     * - Username: admin
+     * - Email: admin@picposter@gmail.com
+     * - Password: admin@123
+     * @param {string} username - Admin username or email
+     * @param {string} password - Admin password
      * @param {string} deviceId
      * @param {string} platform
+     * @param {string} clientIp
      */
-    async adminPasswordLogin(username, password, deviceId = 'web_dashboard', platform = 'web') {
-        if (!username || typeof username !== 'string' || !password || typeof password !== 'string') {
-            throw new AppError('Username and password are required', 400, 'MISSING_FIELDS');
+    async adminPasswordLogin(username, password, deviceId = 'web_dashboard', platform = 'web', clientIp = 'client_ip') {
+        const clientKey = String(clientIp || 'client_ip').trim();
+
+        // Check if client is locked out due to repeated failed attempts
+        const lockout = getLockoutStatus(clientKey);
+        if (lockout && lockout.isLocked) {
+            throw new AppError(
+                'You have made too many failed login attempts. Please try again after 15 minutes.',
+                429,
+                'TOO_MANY_FAILED_ATTEMPTS',
+                [],
+                { retryAfter: lockout.remainingSeconds, lockoutUntil: lockout.lockoutUntil }
+            );
         }
 
-        const cleanUsername = username.trim();
+        if (!username || typeof username !== 'string' || !password || typeof password !== 'string') {
+            throw new AppError('Invalid admin credentials', 401, 'INVALID_CREDENTIALS');
+        }
+
+        const cleanUsername = username.trim().toLowerCase();
         const cleanPassword = password.trim();
 
-        // Check if admin user exists by username, email, or mobile (include password field)
+        // Enforce configured admin credentials only: strictly "admin" OR "admin@picposter@gmail.com"
+        const isConfiguredAdmin = (
+            cleanUsername === 'admin' ||
+            cleanUsername === 'admin@picposter@gmail.com'
+        );
+
+        if (!isConfiguredAdmin) {
+            const failStatus = recordFailedLogin(clientKey);
+            if (failStatus.isLocked) {
+                throw new AppError(
+                    'You have made too many failed login attempts. Please try again after 15 minutes.',
+                    429,
+                    'TOO_MANY_FAILED_ATTEMPTS',
+                    [],
+                    { retryAfter: failStatus.remainingSeconds, lockoutUntil: failStatus.lockoutUntil }
+                );
+            }
+            throw new AppError('Invalid admin credentials', 401, 'INVALID_CREDENTIALS');
+        }
+
+        // Look up the configured admin user in MongoDB
         let adminUser = await User.findOne({
             $or: [
-                { username: cleanUsername.toLowerCase() },
-                { email: cleanUsername.toLowerCase() },
-                { mobile: cleanUsername },
+                { username: 'admin' },
+                { email: 'admin@picposter@gmail.com' },
             ],
+            role: 'admin',
         }).select('+password');
 
-        // If 'admin' user doesn't exist yet, seed/auto-provision default admin
-        if (!adminUser && cleanUsername.toLowerCase() === 'admin') {
+        // Provision/ensure admin user exists if needed
+        if (!adminUser) {
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash('admin@123', salt);
-
-            let existingAdmin = await User.findOne({
-                $or: [{ mobile: '+919999999999' }, { email: 'admin@picposter.com' }, { mobile: '+919876543210' }],
+            adminUser = await User.create({
+                username: 'admin',
+                email: 'admin@picposter@gmail.com',
+                password: hashedPassword,
+                role: 'admin',
+                isVerified: true,
+                isActive: true,
+                name: 'Administrator',
             });
-
-            if (existingAdmin) {
-                existingAdmin.username = 'admin';
-                existingAdmin.password = hashedPassword;
-                existingAdmin.role = 'admin';
-                existingAdmin.isVerified = true;
-                existingAdmin.isActive = true;
-                await existingAdmin.save();
-                adminUser = existingAdmin;
-            } else {
-                adminUser = await User.create({
-                    username: 'admin',
-                    password: hashedPassword,
-                    mobile: '+919999999999',
-                    name: 'Administrator',
-                    email: 'admin@picposter.com',
-                    role: 'admin',
-                    isVerified: true,
-                    isActive: true,
-                });
-            }
-        }
-
-        if (!adminUser) {
-            throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
-        }
-
-        if (adminUser.role !== 'admin') {
-            throw new AppError('Access denied. Administrator privileges required.', 403, 'FORBIDDEN_ADMIN_ONLY');
         }
 
         if (!adminUser.isActive) {
-            throw new AppError('Admin account is deactivated. Please contact support.', 403, 'ACCOUNT_DEACTIVATED');
+            throw new AppError('Invalid admin credentials', 401, 'INVALID_CREDENTIALS');
         }
 
         // Verify password
@@ -338,8 +413,8 @@ class AuthService {
             isMatch = await bcrypt.compare(cleanPassword, adminUser.password);
         }
 
-        // Allow fallback if cleanPassword is admin@123 for default admin
-        if (!isMatch && cleanUsername.toLowerCase() === 'admin' && cleanPassword === 'admin@123') {
+        // Fallback for default admin password admin@123
+        if (!isMatch && cleanPassword === 'admin@123') {
             const salt = await bcrypt.genSalt(10);
             adminUser.password = await bcrypt.hash('admin@123', salt);
             await adminUser.save();
@@ -347,8 +422,21 @@ class AuthService {
         }
 
         if (!isMatch) {
-            throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
+            const failStatus = recordFailedLogin(clientKey);
+            if (failStatus.isLocked) {
+                throw new AppError(
+                    'You have made too many failed login attempts. Please try again after 15 minutes.',
+                    429,
+                    'TOO_MANY_FAILED_ATTEMPTS',
+                    [],
+                    { retryAfter: failStatus.remainingSeconds, lockoutUntil: failStatus.lockoutUntil }
+                );
+            }
+            throw new AppError('Invalid admin credentials', 401, 'INVALID_CREDENTIALS');
         }
+
+        // Clear failed attempts counter on successful login
+        clearFailedLogin(clientKey);
 
         // Update last login
         adminUser.lastLoginAt = new Date();

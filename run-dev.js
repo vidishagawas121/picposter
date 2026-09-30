@@ -67,7 +67,7 @@ backend.stderr.on('data', (data) => {
 const frontend = spawn('npm', ['run', 'dev'], {
     cwd: path.join(__dirname, 'frontend'),
     shell: true,
-    env: { ...process.env, FORCE_COLOR: '1' }
+    env: { ...process.env, PORT: String(frontendPort), VITE_PORT: String(frontendPort), FORCE_COLOR: '1' }
 });
 
 frontend.stdout.on('data', (data) => {

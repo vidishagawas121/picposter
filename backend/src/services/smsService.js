@@ -21,16 +21,17 @@ class SmsService {
      * Send HTTP POST request to Fast2SMS endpoint
      * @param {object} payload
      * @param {string} apiKey
+     * @param {string} [targetUrl]
      * @returns {Promise<object>}
      */
-    _postToFast2Sms(payload, apiKey) {
+    _postToFast2Sms(payload, apiKey, targetUrl) {
         return new Promise((resolve, reject) => {
-            const rawUrl = process.env.FAST2SMS_API_URL || process.env.FAST_TO_SMS_API_URL || 'https://www.fast2sms.com/dev/bulkV2';
+            const rawUrl = targetUrl || process.env.FAST2SMS_API_URL || process.env.FAST_TO_SMS_API_URL || 'https://www.fast2sms.com/dev/bulkV2';
             let parsedUrl;
             try {
                 parsedUrl = new URL(rawUrl);
             } catch (_) {
-                parsedUrl = new URL('https://www.fast2sms.com/dev/bulkV2');
+                parsedUrl = new URL(targetUrl || 'https://www.fast2sms.com/dev/bulkV2');
             }
 
             const isHttps = parsedUrl.protocol === 'https:';
@@ -94,20 +95,23 @@ class SmsService {
     async sendOtp(mobile, otp) {
         const provider = (process.env.SMS_PROVIDER || 'MOCK').toUpperCase();
         const apiKey = process.env.FAST2SMS_API_KEY || process.env.FAST_TO_SMS_API_KEY || process.env.SMS_API_KEY || '';
+        const otpId = process.env.FAST2SMS_OTP_ID || '45f33d9f8a';
         const cleanMobile = this._sanitizeMobile(mobile);
 
         // If provider is set to FAST2SMS and API key is present
         if (provider === 'FAST2SMS' && apiKey) {
             try {
+                const otpEndpoint = process.env.FAST2SMS_OTP_URL || 'https://www.fast2sms.com/dev/otp/send';
                 const payload = {
-                    route: 'otp',
-                    variables_values: otp,
-                    numbers: cleanMobile,
+                    otp_id: otpId,
+                    mobile: cleanMobile,
+                    otp: String(otp),
+                    variables_values: `${otp}|PicPoster`,
                 };
 
-                const response = await this._postToFast2Sms(payload, apiKey);
+                const response = await this._postToFast2Sms(payload, apiKey, otpEndpoint);
 
-                if (response.body && response.body.return === true) {
+                if (response.body && (response.body.return === true || response.body.status_code === 200)) {
                     console.log(`✅ [Fast2SMS] OTP sent successfully to ${cleanMobile}`);
                     return { success: true, data: response.body };
                 } else {
@@ -134,10 +138,18 @@ class SmsService {
         console.log(`[SMS GATEWAY - ${provider} (Service Off / Test Mode)]`);
         console.log(`To: ${mobile} (10-digit: ${cleanMobile})`);
         console.log(`OTP Code: ${otp}`);
+        console.log(`Message: Your OTP for logging in to the Pic Poster application is ${otp}. It is valid for 10 minutes. Do not share this OTP with anyone. - PicPoster (by Fourise)`);
         console.log(`Note: Set SMS_PROVIDER=FAST2SMS in .env to turn live SMS ON`);
         console.log(`========================================\n`);
 
         return { success: true };
+    }
+
+    /**
+     * Alias for sendOtp
+     */
+    async sendOtpSms(mobile, otp) {
+        return this.sendOtp(mobile, otp);
     }
 
     /**
