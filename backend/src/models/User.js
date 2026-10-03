@@ -4,8 +4,9 @@ const userSchema = new mongoose.Schema(
     {
         mobile: {
             type: String,
-            required: [true, 'Mobile number is required'],
+            required: [function () { return this.role !== 'admin'; }, 'Mobile number is required'],
             unique: true,
+            sparse: true,
             index: true,
             trim: true,
             match: [/^\+[1-9]\d{1,14}$/, 'Please provide a valid E.164 phone number (e.g. +919876543210)'],
