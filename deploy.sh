@@ -42,10 +42,10 @@ pm2 save
 # 6. Verify backend health
 echo "🏥 Verifying API health status..."
 sleep 2
-if curl -s -f http://localhost:5000/health > /dev/null; then
+if curl -s -f http://localhost:5088/health > /dev/null; then
     echo "✅ Backend is healthy and serving traffic!"
 else
-    echo "⚠️ Warning: Health check failed on http://localhost:5000/health. Check PM2 logs:"
+    echo "⚠️ Warning: Health check failed on http://localhost:5088/health. Check PM2 logs:"
     pm2 logs picposter-admin-backend --lines 20 --nostream
 fi
 
