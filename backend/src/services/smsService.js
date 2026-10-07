@@ -105,8 +105,10 @@ class SmsService {
                 const payload = {
                     otp_id: otpId,
                     mobile: cleanMobile,
+                    otp_expiry: 10,
+                    otp_length: 6,
                     otp: String(otp),
-                    variables_values: `${otp}|PicPoster`,
+                    variables_values: 'PicPoster',
                 };
 
                 const response = await this._postToFast2Sms(payload, apiKey, otpEndpoint);
@@ -117,18 +119,10 @@ class SmsService {
                 } else {
                     const errorMsg = response.body?.message || `Status code ${response.statusCode}`;
                     console.warn(`⚠️ [Fast2SMS Notice] Gateway response for ${cleanMobile}: ${errorMsg}`);
-
-                    // In non-production or fallback mode, log dev OTP
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.log(`🔑 [DEV OTP FALLBACK] ${mobile}: ${otp}`);
-                    }
                     return { success: false, message: errorMsg };
                 }
             } catch (err) {
                 console.error(`❌ [Fast2SMS Error] Failed to send to ${cleanMobile}:`, err.message);
-                if (process.env.NODE_ENV !== 'production') {
-                    console.log(`🔑 [DEV OTP FALLBACK] ${mobile}: ${otp}`);
-                }
                 return { success: false, message: err.message };
             }
         }
@@ -137,9 +131,8 @@ class SmsService {
         console.log(`\n========================================`);
         console.log(`[SMS GATEWAY - ${provider} (Service Off / Test Mode)]`);
         console.log(`To: ${mobile} (10-digit: ${cleanMobile})`);
-        console.log(`OTP Code: ${otp}`);
-        console.log(`Message: Your OTP for logging in to the Pic Poster application is ${otp}. It is valid for 10 minutes. Do not share this OTP with anyone. - PicPoster (by Fourise)`);
-        console.log(`Note: Set SMS_PROVIDER=FAST2SMS in .env to turn live SMS ON`);
+        console.log(`Note: Live SMS sending disabled or in test mode`);
+        console.log(`Set SMS_PROVIDER=FAST2SMS in .env to turn live SMS ON`);
         console.log(`========================================\n`);
 
         return { success: true };

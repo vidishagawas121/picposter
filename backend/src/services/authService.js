@@ -127,11 +127,6 @@ class AuthService {
             cooldownSeconds: 60,
         };
 
-        // Log OTP to console in development for testing (never sent in response)
-        if (process.env.NODE_ENV !== 'production') {
-            console.log(`\n🔑 [DEV OTP] ${normalizedMobile}: ${otp}\n`);
-        }
-
         return result;
     }
 
