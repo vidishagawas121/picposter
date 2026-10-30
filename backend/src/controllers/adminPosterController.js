@@ -458,6 +458,47 @@ const deletePoster = catchAsync(async (req, res, next) => {
 });
 
 /**
+ * @desc    Delete multiple posters and remove associated images
+ * @route   DELETE /api/v1/admin/posters/bulk
+ * @access  Admin
+ */
+const deleteMultiplePosters = catchAsync(async (req, res, next) => {
+    let ids = req.body?.ids || req.query?.ids;
+
+    if (typeof ids === 'string') {
+        ids = ids.split(',').map((id) => id.trim()).filter(Boolean);
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return next(new AppError('Please provide an array of poster IDs to delete', 400, 'VALIDATION_ERROR'));
+    }
+
+    const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length === 0) {
+        return next(new AppError('No valid poster IDs provided', 400, 'VALIDATION_ERROR'));
+    }
+
+    const posters = await Poster.find({ _id: { $in: validIds } });
+    if (posters.length === 0) {
+        return next(new AppError('No posters found matching the provided IDs', 404, 'POSTER_NOT_FOUND'));
+    }
+
+    // Clean up local media files
+    await Promise.all(
+        posters.flatMap((poster) => [
+            imageService.deleteLocalFile(poster.imageUrl),
+            imageService.deleteLocalFile(poster.thumbnailUrl),
+        ])
+    );
+
+    const deleteResult = await Poster.deleteMany({ _id: { $in: posters.map((p) => p._id) } });
+
+    return sendSuccess(res, 200, `${deleteResult.deletedCount} poster(s) deleted successfully`, {
+        deletedCount: deleteResult.deletedCount,
+    });
+});
+
+/**
  * @desc    Get aggregate poster statistics
  * @route   GET /api/v1/admin/posters/stats
  * @access  Admin
@@ -505,5 +546,6 @@ module.exports = {
     updatePoster,
     updatePosterStatus,
     deletePoster,
+    deleteMultiplePosters,
     getPosterStats,
 };

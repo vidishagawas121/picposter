@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { posterApi } from '../../api/posterApi';
 import { categoryApi } from '../../api/categoryApi';
 import DataTable from '../common/DataTable';
@@ -24,6 +25,7 @@ import {
   TableRow,
   TableCell,
   Menu,
+  Checkbox,
 } from '@mui/material';
 import {
   AddRounded,
@@ -64,7 +66,14 @@ export const PosterListPage = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [posterToDelete, setPosterToDelete] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Clear selection on page/filter change
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [page, limit, search, category, language, isActive, isTrending, isPremium, sortBy, sortOrder]);
 
   // Load categories
   useEffect(() => {
@@ -130,23 +139,86 @@ export const PosterListPage = () => {
     }
   };
 
-  // Handle delete
+  // Selection handlers
+  const currentPageIds = posters.map((p) => p._id || p.id).filter(Boolean);
+  const allSelected = currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id));
+  const someSelected = currentPageIds.some((id) => selectedIds.includes(id)) && !allSelected;
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentPageIds])));
+    } else {
+      const currentSet = new Set(currentPageIds);
+      setSelectedIds((prev) => prev.filter((id) => !currentSet.has(id)));
+    }
+  };
+
+  const handleToggleSelect = (posterId, e) => {
+    if (e) e.stopPropagation();
+    setSelectedIds((prev) =>
+      prev.includes(posterId) ? prev.filter((id) => id !== posterId) : [...prev, posterId]
+    );
+  };
+
+  // Handle single delete
   const handleDeleteConfirm = async () => {
     if (!posterToDelete) return;
     try {
       setActionLoading(true);
-      await posterApi.deletePoster(posterToDelete._id || posterToDelete.id);
+      const deleteId = posterToDelete._id || posterToDelete.id;
+      await posterApi.deletePoster(deleteId);
       setDeleteOpen(false);
       setPosterToDelete(null);
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteId));
+      toast.success('Poster deleted successfully');
       fetchPosters();
     } catch (err) {
       console.error('Failed to delete poster:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete poster');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      setActionLoading(true);
+      const res = await posterApi.deleteMultiplePosters(selectedIds);
+      toast.success(res.data?.message || `Successfully deleted ${selectedIds.length} posters`);
+      setSelectedIds([]);
+      setBulkDeleteOpen(false);
+      fetchPosters();
+    } catch (err) {
+      console.error('Failed to delete selected posters:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete selected posters');
     } finally {
       setActionLoading(false);
     }
   };
 
   const columns = [
+    {
+      id: 'select',
+      label: (
+        <Checkbox
+          size="small"
+          indeterminate={someSelected}
+          checked={allSelected}
+          onChange={handleSelectAll}
+          color="primary"
+          sx={{
+            color: 'rgba(255, 255, 255, 0.4)',
+            '&.Mui-checked': { color: 'primary.main' },
+            '&.MuiCheckbox-indeterminate': { color: 'primary.main' },
+            p: 0,
+          }}
+        />
+      ),
+      width: 50,
+      align: 'center',
+    },
     { id: 'thumbnail', label: 'Preview', width: 80 },
     { id: 'title', label: 'Title & Category', minWidth: 200 },
     { id: 'language', label: 'Language', width: 120 },
@@ -178,6 +250,23 @@ export const PosterListPage = () => {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+          {selectedIds.length > 0 && (
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteOutlineRounded />}
+              onClick={() => setBulkDeleteOpen(true)}
+              sx={{
+                py: 1.2,
+                px: 2.5,
+                fontWeight: 700,
+                boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.35)',
+              }}
+            >
+              Delete Selected ({selectedIds.length})
+            </Button>
+          )}
+
           <Button
             variant="contained"
             color="primary"
@@ -413,16 +502,43 @@ export const PosterListPage = () => {
           setLimit(newLimit);
           setPage(1);
         }}
-        renderRow={(poster) => (
-          <TableRow key={poster._id || poster.id} hover sx={{ cursor: 'pointer' }}>
-            <TableCell onClick={() => { setSelectedPoster(poster); setDetailOpen(true); }}>
-              <Avatar
-                variant="rounded"
-                src={poster.thumbnailUrl || poster.imageUrl}
-                alt={poster.title}
-                sx={{ width: 46, height: 46, borderRadius: 2 }}
-              />
-            </TableCell>
+        renderRow={(poster) => {
+          const posterId = poster._id || poster.id;
+          const isSelected = selectedIds.includes(posterId);
+          return (
+            <TableRow key={posterId} hover selected={isSelected} sx={{ cursor: 'pointer' }}>
+              <TableCell
+                align="center"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleSelect(posterId);
+                }}
+                sx={{ width: 50, px: 0.5 }}
+              >
+                <Checkbox
+                  size="small"
+                  checked={isSelected}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    handleToggleSelect(posterId);
+                  }}
+                  color="primary"
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    '&.Mui-checked': { color: 'primary.main' },
+                    p: 0,
+                  }}
+                />
+              </TableCell>
+
+              <TableCell onClick={() => { setSelectedPoster(poster); setDetailOpen(true); }}>
+                <Avatar
+                  variant="rounded"
+                  src={poster.thumbnailUrl || poster.imageUrl}
+                  alt={poster.title}
+                  sx={{ width: 46, height: 46, borderRadius: 2 }}
+                />
+              </TableCell>
 
             <TableCell onClick={() => { setSelectedPoster(poster); setDetailOpen(true); }}>
               <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ maxWidth: 280 }}>
@@ -514,7 +630,8 @@ export const PosterListPage = () => {
               </Box>
             </TableCell>
           </TableRow>
-        )}
+        );
+      }}
       />
 
       {/* Modals & Panels */}
@@ -557,6 +674,17 @@ export const PosterListPage = () => {
           setDeleteOpen(false);
           setPosterToDelete(null);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="Delete Selected Posters"
+        message={`Are you sure you want to delete the selected ${selectedIds.length} posters?`}
+        confirmText="Delete Selected"
+        confirmColor="error"
+        loading={actionLoading}
+        onConfirm={handleBulkDeleteConfirm}
+        onCancel={() => setBulkDeleteOpen(false)}
       />
     </Box>
   );

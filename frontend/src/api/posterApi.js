@@ -20,4 +20,6 @@ export const posterApi = {
   updatePosterStatus: (id, isActive) =>
     axiosInstance.patch(`/admin/posters/${id}/status`, { isActive }),
   deletePoster: (id) => axiosInstance.delete(`/admin/posters/${id}`),
+  deleteMultiplePosters: (ids) =>
+    axiosInstance.delete('/admin/posters/bulk', { data: { ids } }),
 };
