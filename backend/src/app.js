@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const businessRoutes = require('./routes/businessRoutes');
 const posterRoutes = require('./routes/posterRoutes');
+const trendingRoutes = require('./routes/trendingRoutes');
 const supportRoutes = require('./routes/supportRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
@@ -123,6 +124,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/business', businessRoutes);
 app.use('/api/v1/posters', posterRoutes);
+app.use('/api/v1/trending', trendingRoutes);
 app.use('/api/v1/support', supportRoutes);
 
 // Admin Routes (Protected by Auth & Admin RBAC)
